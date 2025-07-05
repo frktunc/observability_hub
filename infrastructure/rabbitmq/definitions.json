@@ -1,0 +1,347 @@
+{
+  "rabbit_version": "3.12.10",
+  "rabbitmq_version": "3.12.10",
+  "product_name": "RabbitMQ",
+  "product_version": "3.12.10",
+  "users": [],
+  "vhosts": [
+    {
+      "name": "/observability"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "obs_user",
+      "vhost": "/observability",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "topic_permissions": [],
+  "parameters": [],
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "observability_cluster"
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "/observability",
+      "name": "logs-ha-policy",
+      "pattern": "^logs\\.",
+      "apply-to": "queues",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "message-ttl": 86400000,
+        "max-length": 100000
+      },
+      "priority": 10
+    },
+    {
+      "vhost": "/observability",
+      "name": "metrics-ha-policy",
+      "pattern": "^metrics\\.",
+      "apply-to": "queues",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "message-ttl": 3600000,
+        "max-length": 50000
+      },
+      "priority": 10
+    },
+    {
+      "vhost": "/observability",
+      "name": "traces-ha-policy",
+      "pattern": "^traces\\.",
+      "apply-to": "queues",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "message-ttl": 86400000,
+        "max-length": 50000
+      },
+      "priority": 10
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "logs.topic",
+      "vhost": "/observability",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "metrics.topic",
+      "vhost": "/observability",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "traces.topic",
+      "vhost": "/observability",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "alerts.topic",
+      "vhost": "/observability",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "health.topic",
+      "vhost": "/observability",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dlx.logs",
+      "vhost": "/observability",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dlx.metrics",
+      "vhost": "/observability",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "dlx.traces",
+      "vhost": "/observability",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "logs.collector",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx.logs",
+        "x-dead-letter-routing-key": "failed",
+        "x-max-retries": 3,
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "logs.info",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx.logs",
+        "x-dead-letter-routing-key": "failed",
+        "x-max-retries": 3,
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "logs.warning",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx.logs",
+        "x-dead-letter-routing-key": "failed",
+        "x-max-retries": 3,
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "logs.error",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx.logs",
+        "x-dead-letter-routing-key": "failed",
+        "x-max-retries": 3,
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "metrics.collector",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx.metrics",
+        "x-dead-letter-routing-key": "failed",
+        "x-max-retries": 3,
+        "x-message-ttl": 3600000
+      }
+    },
+    {
+      "name": "traces.collector",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "dlx.traces",
+        "x-dead-letter-routing-key": "failed",
+        "x-max-retries": 3,
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "alerts.processor",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 3600000
+      }
+    },
+    {
+      "name": "health.monitor",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 300000
+      }
+    },
+    {
+      "name": "dlq.logs",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "dlq.metrics",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "dlq.traces",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "logs.topic",
+      "vhost": "/observability",
+      "destination": "logs.collector",
+      "destination_type": "queue",
+      "routing_key": "logs.*",
+      "arguments": {}
+    },
+    {
+      "source": "logs.topic",
+      "vhost": "/observability",
+      "destination": "logs.info",
+      "destination_type": "queue",
+      "routing_key": "logs.info",
+      "arguments": {}
+    },
+    {
+      "source": "logs.topic",
+      "vhost": "/observability",
+      "destination": "logs.warning",
+      "destination_type": "queue",
+      "routing_key": "logs.warning",
+      "arguments": {}
+    },
+    {
+      "source": "logs.topic",
+      "vhost": "/observability",
+      "destination": "logs.error",
+      "destination_type": "queue",
+      "routing_key": "logs.error",
+      "arguments": {}
+    },
+    {
+      "source": "metrics.topic",
+      "vhost": "/observability",
+      "destination": "metrics.collector",
+      "destination_type": "queue",
+      "routing_key": "metrics.*",
+      "arguments": {}
+    },
+    {
+      "source": "traces.topic",
+      "vhost": "/observability",
+      "destination": "traces.collector",
+      "destination_type": "queue",
+      "routing_key": "traces.*",
+      "arguments": {}
+    },
+    {
+      "source": "alerts.topic",
+      "vhost": "/observability",
+      "destination": "alerts.processor",
+      "destination_type": "queue",
+      "routing_key": "alerts.*",
+      "arguments": {}
+    },
+    {
+      "source": "health.topic",
+      "vhost": "/observability",
+      "destination": "health.monitor",
+      "destination_type": "queue",
+      "routing_key": "health.*",
+      "arguments": {}
+    },
+    {
+      "source": "dlx.logs",
+      "vhost": "/observability",
+      "destination": "dlq.logs",
+      "destination_type": "queue",
+      "routing_key": "failed",
+      "arguments": {}
+    },
+    {
+      "source": "dlx.metrics",
+      "vhost": "/observability",
+      "destination": "dlq.metrics",
+      "destination_type": "queue",
+      "routing_key": "failed",
+      "arguments": {}
+    },
+    {
+      "source": "dlx.traces",
+      "vhost": "/observability",
+      "destination": "dlq.traces",
+      "destination_type": "queue",
+      "routing_key": "failed",
+      "arguments": {}
+    }
+  ]
+} 
