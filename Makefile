@@ -27,6 +27,14 @@ init: ## Initialize project and create .env file
 
 up: ## Start all services
 	@echo "🚀 Starting Observability Hub..."
+	@echo ""
+	@echo " _____  _____  _____ "
+	@echo "|  ___|/  ___||_   _|"
+	@echo "| |_   \ \`--.   | |  "
+	@echo "|  _|   \`--. \  | |  "
+	@echo "| |    /\__/ /  | |  "
+	@echo "\_|    \____/   \_/  "
+	@echo ""
 	@docker-compose up -d
 	@echo "⏳ Waiting for services to be ready..."
 	@sleep 30
