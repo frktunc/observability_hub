@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://observability-hub.com/schemas/base-event.schema.json",
+  "title": "Base Event Schema",
+  "description": "Common base schema for all observability events",
+  "type": "object",
+  "required": [
+    "eventId",
+    "eventType",
+    "version",
+    "timestamp",
+    "correlationId",
+    "source",
+    "metadata"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for this event"
+    },
+    "eventType": {
+      "type": "string",
+      "pattern": "^[a-z]+\\.[a-z]+\\.[a-z]+$",
+      "description": "Event type in format: domain.entity.action (e.g., log.message.created)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version (semantic versioning)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 timestamp when the event occurred"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation ID for tracking related events across services"
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the event that caused this event (for event sourcing)"
+    },
+    "source": {
+      "type": "object",
+      "required": ["service", "version"],
+      "properties": {
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the service that generated this event"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Version of the service"
+        },
+        "instance": {
+          "type": "string",
+          "description": "Instance ID or hostname"
+        },
+        "region": {
+          "type": "string",
+          "description": "Geographic region or datacenter"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tracing": {
+      "type": "object",
+      "required": ["traceId"],
+      "properties": {
+        "traceId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$|^[a-f0-9]{16}$",
+          "description": "Distributed tracing trace ID (16 or 32 hex chars)"
+        },
+        "spanId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$",
+          "description": "Distributed tracing span ID (16 hex chars)"
+        },
+        "parentSpanId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$",
+          "description": "Parent span ID"
+        },
+        "flags": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "Tracing flags (sampled, debug, etc.)"
+        },
+        "baggage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Tracing baggage key-value pairs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["priority"],
+      "properties": {
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "normal", "low"],
+          "description": "Event processing priority"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "Searchable tags for categorization"
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["production", "staging", "development", "testing"],
+          "description": "Environment where the event originated"
+        },
+        "retryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of retry attempts for this event"
+        },
+        "schemaUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the schema definition"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+} 

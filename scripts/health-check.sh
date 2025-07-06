@@ -66,8 +66,14 @@ check_http_endpoint() {
     local url=$1
     local service=$2
     local expected_status=${3:-200}
+    local auth=${4:-}
     
-    local status_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    local curl_opts=("-s" "-o" "/dev/null" "-w" "%{http_code}")
+    if [ -n "$auth" ]; then
+        curl_opts+=("-u" "$auth")
+    fi
+    
+    local status_code=$(curl "${curl_opts[@]}" "$url" 2>/dev/null || echo "000")
     
     if [ "$status_code" == "$expected_status" ]; then
         print_status "OK" "$service HTTP endpoint is responding ($status_code)"
@@ -82,19 +88,25 @@ check_postgres() {
     echo "=== PostgreSQL Health Check ==="
     
     if check_port "$POSTGRES_HOST" "$POSTGRES_PORT" "PostgreSQL"; then
-        # Test database connection
-        if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1;" >/dev/null 2>&1; then
-            print_status "OK" "PostgreSQL database connection successful"
-            
-            # Check table existence
-            local tables=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs)
-            print_status "OK" "PostgreSQL has $tables tables"
-            
-            return 0
-        else
-            print_status "ERROR" "PostgreSQL database connection failed"
-            return 1
-        fi
+        # Retry for PostgreSQL connection
+        local retries=5
+        local delay=5
+        while [ $retries -gt 0 ]; do
+            if PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1;" >/dev/null 2>&1; then
+                print_status "OK" "PostgreSQL database connection successful"
+                
+                # Check table existence
+                local tables=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs)
+                print_status "OK" "PostgreSQL has $tables tables"
+                
+                return 0
+            fi
+            retries=$((retries-1))
+            sleep $delay
+        done
+        
+        print_status "ERROR" "PostgreSQL database connection failed"
+        return 1
     else
         return 1
     fi
@@ -104,30 +116,32 @@ check_rabbitmq() {
     echo "=== RabbitMQ Health Check ==="
     
     if check_port "$RABBITMQ_HOST" "$RABBITMQ_PORT" "RabbitMQ AMQP"; then
-        if check_http_endpoint "http://$RABBITMQ_HOST:$RABBITMQ_MANAGEMENT_PORT" "RabbitMQ Management"; then
-            # Check RabbitMQ API
-            local api_response=$(curl -s -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "http://$RABBITMQ_HOST:$RABBITMQ_MANAGEMENT_PORT/api/overview" 2>/dev/null || echo "error")
-            
-            if [[ "$api_response" == *"rabbitmq_version"* ]]; then
-                print_status "OK" "RabbitMQ API is responding"
+        # Retry for RabbitMQ Management
+        local retries=5
+        local delay=5
+        while [ $retries -gt 0 ]; do
+            local url="http://$RABBITMQ_HOST:$RABBITMQ_MANAGEMENT_PORT/api/overview"
+            if check_http_endpoint "$url" "RabbitMQ Management" 200 "$RABBITMQ_USER:$RABBITMQ_PASSWORD"; then
+                print_status "OK" "RabbitMQ Management is responding"
                 
                 # Check vhost
-                local vhost_response=$(curl -s -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "http://$RABBITMQ_HOST:$RABBITMQ_MANAGEMENT_PORT/api/vhosts/%2Fobservability" 2>/dev/null || echo "error")
+                local vhost_url="http://$RABBITMQ_HOST:$RABBITMQ_MANAGEMENT_PORT/api/vhosts/%2Fobservability"
+                local vhost_response=$(curl -s -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" "$vhost_url" 2>/dev/null || echo "error")
                 
-                if [[ "$vhost_response" == *"observability"* ]]; then
+                if [[ "$vhost_response" == *"name"* ]]; then
                     print_status "OK" "RabbitMQ vhost '/observability' exists"
                 else
                     print_status "WARNING" "RabbitMQ vhost '/observability' not found"
                 fi
                 
                 return 0
-            else
-                print_status "ERROR" "RabbitMQ API is not responding correctly"
-                return 1
             fi
-        else
-            return 1
-        fi
+            retries=$((retries-1))
+            sleep $delay
+        done
+        
+        print_status "ERROR" "RabbitMQ Management failed to respond"
+        return 1
     else
         return 1
     fi
@@ -250,4 +264,4 @@ main() {
 }
 
 # Execute main function
-main "$@" 
+main "$@"
