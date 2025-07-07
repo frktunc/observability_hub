@@ -208,3 +208,33 @@ services:
       - redis
     networks:
       - observability
+
+  # Order Service
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    container_name: obs_order_service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - HOST=0.0.0.0
+      - DATABASE_URL=postgresql://order_service_user:order_service_password@order_service_db:5432/order_service_db
+      - DATABASE_HOST=order_service_db
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=order_service_db
+      - DATABASE_USER=order_service_user
+      - DATABASE_PASSWORD=order_service_password
+      - RABBITMQ_URL=amqp://obs_user:obs_password@obs_rabbitmq:5672
+      - RABBITMQ_VHOST=/observability
+      - RABBITMQ_EXCHANGE=logs.topic
+      - REDIS_URL=redis://obs_redis:6379
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+    networks:
+      - observability
