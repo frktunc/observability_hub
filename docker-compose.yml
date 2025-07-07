@@ -32,6 +32,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d
       - ./infrastructure/postgres/config/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./infrastructure/postgres/config/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf' -c 'hba_file=/etc/postgresql/pg_hba.conf'
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     networks:
@@ -73,6 +75,40 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Go Collector Service
+  collector:
+    build:
+      context: ./golang
+      dockerfile: ./cmd/collector/Dockerfile
+    container_name: obs_collector
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-/observability}
+      - POSTGRES_URL=postgres://${POSTGRES_USER:-obs_user}:${POSTGRES_PASSWORD:-obs_password}@postgres:5432/${POSTGRES_DB:-observability_db}?sslmode=disable
+      - COLLECTOR_BATCH_SIZE=500
+      - COLLECTOR_BATCH_TIMEOUT=5s
+      - COLLECTOR_WORKER_POOL_SIZE=20
+      - COLLECTOR_RETRY_MAX=5
+      - COLLECTOR_RETRY_INTERVAL=2s
+      - METRICS_PORT=9090
+      - HEALTH_CHECK_PORT=8081
+    ports:
+      - "9090:9090" # Prometheus Metrics
+      - "8081:8081" # Health Check
+    networks:
+      - observability
     deploy:
       resources:
         limits:

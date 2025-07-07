@@ -5,6 +5,24 @@
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Create user if not exists
+DO
+$do$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles
+      WHERE  rolname = 'obs_user') THEN
+      CREATE USER obs_user WITH PASSWORD 'obs_password';
+   END IF;
+END
+$do$;
+
+-- Grant privileges to obs_user
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO obs_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO obs_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO obs_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO obs_user;
+
 -- ==============================================
 -- LOGS TABLE
 -- ==============================================

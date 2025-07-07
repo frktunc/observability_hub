@@ -2,4 +2,4 @@ FROM alpine:3.18
 RUN apk add --no-cache bash postgresql-client redis netcat-openbsd curl
 COPY health-check.sh /usr/local/bin/health-check.sh
 RUN chmod +x /usr/local/bin/health-check.sh
-ENTRYPOINT ["health-check.sh"]
+CMD ["/bin/bash"]

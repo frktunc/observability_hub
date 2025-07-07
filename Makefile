@@ -2,7 +2,7 @@
 # OBSERVABILITY HUB - Makefile
 # ==============================================
 
-.PHONY: help up down restart health logs clean build test lint format init
+.PHONY: help up down restart health logs clean build test lint format init start-services stop-services
 
 # Default target
 help: ## Show this help message
@@ -14,19 +14,22 @@ help: ## Show this help message
 # INFRASTRUCTURE MANAGEMENT
 # ==============================================
 
-init: ## Initialize project and create .env file
+init: ## Initialize project and create .env files
 	@echo "🔧 Initializing Observability Hub..."
 	@if [ ! -f .env ]; then \
 		cp env.example .env; \
-		echo "✅ .env file created from template"; \
-	else \
-		echo "⚠️  .env file already exists"; \
+		echo "✅ Main .env file created from template"; \
 	fi
+	@for service in user-service order-service product-service; do \
+		if [ ! -f services/$$service/.env ]; then \
+			cp services/$$service/.env.example services/$$service/.env 2>/dev/null || echo "⚠️  No .env.example found for $$service"; \
+		fi; \
+	done
 	@chmod +x scripts/health-check.sh
 	@echo "✅ Project initialized successfully!"
 
-up: ## Start all services
-	@echo "🚀 Starting Observability Hub..."
+up: ## Start all infrastructure services
+	@echo "🚀 Starting Observability Hub Infrastructure..."
 	@echo ""
 	@echo " _____  _____  _____ "
 	@echo "|  ___|/  ___||_   _|"
@@ -35,36 +38,70 @@ up: ## Start all services
 	@echo "| |    /\__/ /  | |  "
 	@echo "\_|    \____/   \_/  "
 	@echo ""
-	@docker-compose up -d
-	@echo "⏳ Waiting for services to be ready..."
-	@sleep 30
-	@make health
+	@docker-compose up -d postgres rabbitmq jaeger grafana redis
+	@echo "⏳ Waiting for infrastructure to be ready..."
+	@sleep 20
+	@make health-infra
 
 down: ## Stop all services
-	@echo "🛑 Stopping Observability Hub..."
+	@echo "🛑 Stopping all services..."
+	@make stop-services
 	@docker-compose down
 
 restart: ## Restart all services
-	@echo "🔄 Restarting Observability Hub..."
-	@docker-compose restart
-
-stop: ## Stop all services (alias for down)
+	@echo "🔄 Restarting all services..."
 	@make down
+	@make up
+	@make start-services
+
+# ==============================================
+# SERVICE MANAGEMENT
+# ==============================================
+
+start-services: ## Start all microservices
+	@echo "🚀 Starting microservices..."
+	@cd services/user-service && npm start &
+	@cd services/order-service && npm start &
+	@cd services/product-service && npm start &
+	@echo "⏳ Waiting for services to start..."
+	@sleep 10
+	@make health-services
+
+stop-services: ## Stop all microservices
+	@echo "🛑 Stopping microservices..."
+	@pkill -f "node.*services/.*/dist/index.js" || true
 
 # ==============================================
 # HEALTH & MONITORING
 # ==============================================
 
 health: ## Run comprehensive health check
-	@echo "🔍 Running health check..."
+	@echo "🔍 Running comprehensive health check..."
+	@make health-infra
+	@make health-services
+
+health-infra: ## Check infrastructure health
+	@echo "🔍 Checking infrastructure health..."
 	@docker-compose run --rm health-check
+
+health-services: ## Check microservices health
+	@echo "🔍 Checking microservices health..."
+	@curl -s http://localhost:3001/health || echo "❌ User Service not responding"
+	@curl -s http://localhost:3002/health || echo "❌ Order Service not responding"
+	@curl -s http://localhost:3003/health || echo "❌ Product Service not responding"
 
 health-quick: ## Quick health check (ports only)
 	@echo "⚡ Quick health check..."
 	@docker-compose ps
+	@echo "\nMicroservices Status:"
+	@ps aux | grep "node.*services/.*/dist/index.js" | grep -v grep || echo "No microservices running"
 
 logs: ## Show logs for all services
 	@docker-compose logs -f
+
+logs-services: ## Show logs for all microservices
+	@echo "📋 Tailing microservices logs..."
+	@tail -f services/*/logs/app.log
 
 logs-postgres: ## Show PostgreSQL logs
 	@docker-compose logs -f postgres
@@ -254,3 +291,35 @@ urls: ## Show all service URLs
 	@echo "RabbitMQ: obs_user / obs_secure_password_2024"
 	@echo "Grafana: admin / admin123"
 	@echo "PostgreSQL: obs_user / obs_secure_password_2024"
+
+# ==============================================
+# SERVICE-SPECIFIC COMMANDS
+# ==============================================
+
+user-service: ## Start user service
+	@echo "🚀 Starting user service..."
+	@cd services/user-service && npm start
+
+order-service: ## Start order service
+	@echo "🚀 Starting order service..."
+	@cd services/order-service && npm start
+
+product-service: ## Start product service
+	@echo "🚀 Starting product service..."
+	@cd services/product-service && npm start
+
+install-deps: ## Install dependencies for all services
+	@echo "📦 Installing dependencies..."
+	@for service in user-service order-service product-service; do \
+		echo "Installing dependencies for $$service..."; \
+		cd services/$$service && npm install && cd ../..; \
+	done
+	@echo "✅ All dependencies installed"
+
+build-services: ## Build all services
+	@echo "🔨 Building services..."
+	@for service in user-service order-service product-service; do \
+		echo "Building $$service..."; \
+		cd services/$$service && npm run build && cd ../..; \
+	done
+	@echo "✅ All services built"
