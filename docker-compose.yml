@@ -8,6 +8,8 @@ networks:
 volumes:
   postgres_data:
     driver: local
+  user_service_db_data:
+    driver: local
   rabbitmq_data:
     driver: local
   grafana_data:
@@ -130,6 +132,35 @@ services:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
       interval: 30s
       timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # User Service Database
+  user_service_db:
+    image: postgres:15-alpine
+    container_name: obs_user_service_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${USER_SERVICE_DB_NAME:-user_service_db}
+      POSTGRES_USER: ${USER_SERVICE_DB_USER:-user_service_user}
+      POSTGRES_PASSWORD: ${USER_SERVICE_DB_PASSWORD:-user_service_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - user_service_db_data:/var/lib/postgresql/data
+      - ./infrastructure/user-service/db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "${USER_SERVICE_DB_PORT:-5434}:5432"
+    networks:
+      - observability
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_SERVICE_DB_USER:-user_service_user} -d ${USER_SERVICE_DB_NAME:-user_service_db}"]
+      interval: 10s
+      timeout: 5s
       retries: 5
     deploy:
       resources:

@@ -3,13 +3,27 @@
   "rabbitmq_version": "3.12.10",
   "product_name": "RabbitMQ",
   "product_version": "3.12.10",
-  "users": [],
+  "users": [
+    {
+      "name": "obs_user",
+      "password": "obs_password",
+      "tags": "administrator"
+    }
+  ],
   "vhosts": [
     {
       "name": "/observability"
     }
   ],
-  "permissions": [],
+  "permissions": [
+    {
+      "user": "obs_user",
+      "vhost": "/observability",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
   "topic_permissions": [],
   "parameters": [],
   "global_parameters": [

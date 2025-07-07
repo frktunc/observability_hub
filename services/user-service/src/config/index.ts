@@ -16,6 +16,17 @@ const configSchema = z.object({
   SERVICE_VERSION: z.string().default('1.0.0'),
   SERVICE_INSTANCE_ID: z.string().optional(),
   
+  // Database Configuration
+  DATABASE_URL: z.string().default('postgresql://user_service_user:user_service_password@user_service_db:5432/user_service_db'),
+  DATABASE_HOST: z.string().default('user_service_db'),
+  DATABASE_PORT: z.coerce.number().default(5432),
+  DATABASE_NAME: z.string().default('user_service_db'),
+  DATABASE_USER: z.string().default('user_service_user'),
+  DATABASE_PASSWORD: z.string().default('user_service_password'),
+  DATABASE_POOL_MIN: z.coerce.number().default(2),
+  DATABASE_POOL_MAX: z.coerce.number().default(10),
+  DATABASE_TIMEOUT: z.coerce.number().default(5000),
+  
   // RabbitMQ Configuration
   RABBITMQ_URL: z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
   RABBITMQ_VHOST: z.string().default('/observability'),
@@ -105,6 +116,21 @@ export const derivedConfig = {
   httpUrl: `http://${config.HOST}:${config.PORT}`,
   grpcUrl: `${config.GRPC_HOST}:${config.GRPC_PORT}`,
   metricsUrl: `http://${config.HOST}:${config.METRICS_PORT}${config.METRICS_PATH}`,
+  
+  // Database configuration
+  database: {
+    url: config.DATABASE_URL,
+    host: config.DATABASE_HOST,
+    port: config.DATABASE_PORT,
+    name: config.DATABASE_NAME,
+    user: config.DATABASE_USER,
+    password: config.DATABASE_PASSWORD,
+    pool: {
+      min: config.DATABASE_POOL_MIN,
+      max: config.DATABASE_POOL_MAX,
+    },
+    timeout: config.DATABASE_TIMEOUT,
+  },
   
   // RabbitMQ routing
   rabbitmq: {
