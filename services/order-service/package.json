@@ -15,7 +15,7 @@
   "author": "Observability Hub Team",
   "license": "MIT",
   "dependencies": {
-       "@observability-hub/log-client": "file:../../packages/log-client/observability-hub-log-client-1.0.0.tgz",
+    "@observability-hub/log-client": "file:packages/log-client",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "helmet": "^7.1.0",

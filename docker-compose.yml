@@ -59,7 +59,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-obs_user}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-obs_password}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/observability}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-observability}
       RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-observability_cookie}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -95,7 +95,7 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-/observability}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-observability}
       - POSTGRES_URL=postgres://${POSTGRES_USER:-obs_user}:${POSTGRES_PASSWORD:-obs_password}@postgres:5432/${POSTGRES_DB:-observability_db}?sslmode=disable
       - COLLECTOR_BATCH_SIZE=500
       - COLLECTOR_BATCH_TIMEOUT=5s
@@ -229,6 +229,33 @@ services:
         reservations:
           memory: 64M
 
+  # Order Service (Log Producer Example)
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    container_name: obs_order_service
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - jaeger
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-observability}
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6832
+    ports:
+      - "8080:8080"
+    networks:
+      - observability
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
   # Health Check Service
   health-check:
     build:
@@ -241,36 +268,6 @@ services:
       - rabbitmq
       - jaeger
       - grafana
-      - redis
-    networks:
-      - observability
-
-  # Order Service
-  order-service:
-    build:
-      context: .
-      dockerfile: services/order-service/Dockerfile
-    container_name: obs_order_service
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      - PORT=3002
-      - HOST=0.0.0.0
-      - DATABASE_URL=postgresql://order_service_user:order_service_password@order_service_db:5432/order_service_db
-      - DATABASE_HOST=order_service_db
-      - DATABASE_PORT=5432
-      - DATABASE_NAME=order_service_db
-      - DATABASE_USER=order_service_user
-      - DATABASE_PASSWORD=order_service_password
-      - RABBITMQ_URL=amqp://obs_user:obs_password@obs_rabbitmq:5672
-      - RABBITMQ_VHOST=/observability
-      - RABBITMQ_EXCHANGE=logs.topic
-      - REDIS_URL=redis://obs_redis:6379
-    ports:
-      - "3002:3002"
-    depends_on:
-      - postgres
-      - rabbitmq
       - redis
     networks:
       - observability

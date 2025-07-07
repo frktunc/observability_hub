@@ -1,397 +1,94 @@
-# 🔍 Observability Hub - Infrastructure Foundation
+# Observability Hub
 
-Production-ready infrastructure for event-driven logging platform with distributed tracing, metrics collection, and real-time monitoring.
+Bu proje, olay tabanlı (event-driven) bir mimari kullanarak tasarlanmış, dayanıklı ve yüksek performanslı bir log toplama ve analiz platformudur.
 
-## 🏗️ Architecture Overview
+## Proje Mimarisi
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  User Service   │───▶│    RabbitMQ     │───▶│   Collector     │
-│   (TypeScript)  │    │   (Message      │    │   Service (Go)  │
-│                 │    │    Broker)      │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-        │                       │                       │
-        ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Log Client     │    │   PostgreSQL    │    │   Data Store    │
-│   Library       │    │   (Database)    │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                        │
-                                                        ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     Grafana     │◀───│     Redis       │◀───│     Caching     │
-│   (Dashboards)  │    │   (Caching)     │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+Sistem, Docker üzerinde çalışan bir dizi mikroservis ve altyapı bileşeninden oluşur:
 
-## 🚀 Quick Start
+- **Log Üreticileri (`order-service`, `product-service` vb.):**
+  - Uygulama logları üreten Node.js servisleri.
+  - Örnek: `order-service` `http://localhost:8080` portundan istek kabul eder.
 
-### Prerequisites
+- **RabbitMQ (`obs_rabbitmq`):**
+  - Üreticiler ve toplayıcı arasındaki iletişimi sağlayan merkezi mesaj kuyruğu.
+  - Yönetim arayüzü: `http://localhost:15672`
 
-- Docker & Docker Compose
-- Make (optional, for convenience commands)
-- 8GB RAM minimum, 16GB recommended
-- 10GB free disk space
+- **Go Collector (`obs_collector`):**
+  - RabbitMQ'dan gelen logları yüksek performansla işleyen ve veritabanına kaydeden Go servisi.
+  - Metrikler: `http://localhost:9090/metrics`
+  - Sağlık durumu: `http://localhost:9090/health`
 
-### 1. Initialize Project
+- **PostgreSQL (`obs_postgres`):**
+  - Toplanan tüm log olaylarının depolandığı ana veritabanı.
+  - Bağlantı portu: `5433`
+
+- **Gözlemlenebilirlik Araçları:**
+  - **Jaeger (`obs_jaeger`):** Dağıtık izleme (distributed tracing) için. Arayüz: `http://localhost:16686`
+  - **Grafana (`obs_grafana`):** Metrikleri ve logları görselleştirmek için. Arayüz: `http://localhost:3000`
+
+---
+
+## Hızlı Başlangıç Kılavuzu
+
+Bu kılavuz, projeyi yerel makinenizde hızla ayağa kaldırmanızı sağlar.
+
+### 1. Gereksinimler
+- [Docker](https://www.docker.com/products/docker-desktop/) ve Docker Compose
+- [Git](https://git-scm.com/downloads)
+- `curl` veya benzeri bir API test aracı
+
+### 2. Kurulum ve Çalıştırma
+
+Tüm altyapıyı ve servisleri başlatmak için projenin kök dizininde aşağıdaki komutları çalıştırmanız yeterlidir.
 
 ```bash
+# Projeyi klonlayın ve dizine girin
+git clone <repository_url>
+cd observability_hub
+
+# Gerekli .env dosyalarını oluşturun
 make init
-```
 
-This will:
-- Create `.env` file from template
-- Set executable permissions on scripts
-- Prepare the project structure
-
-### 2. Start All Services
-
-```bash
+# Tüm sistemi başlatın
 make up
+make start-services
 ```
+> **Not:** `make up` komutu altyapı servislerini (Postgres, RabbitMQ vb.) başlatır. `make start-services` ise uygulama servislerini (order-service vb.) Node.js olarak yerel makinede başlatır. Tamamen Docker içinde bir deneyim için `docker-compose.yml` dosyasını düzenleyebilirsiniz.
 
-This will:
-- Start all infrastructure services
-- Wait for services to be ready
-- Run health checks automatically
+### 3. Sistemin Çalıştığını Doğrulama
 
-### 3. Start User Service
+Sistemin beklendiği gibi çalıştığını test etmek için aşağıdaki adımları izleyin:
 
+**a. Log Olayı Tetikleyin:**
+`order-service`'e bir sipariş oluşturma isteği gönderin. Bu, tüm boru hattını (pipeline) tetikleyecektir.
 ```bash
-cd services/user-service
-npm install
-npm run dev
+curl -X POST http://localhost:8080/orders \
+-H "Content-Type: application/json" \
+-d '{"productId": "product-12345", "quantity": 2, "user": "faruk"}'
 ```
 
-### 4. Verify Installation
-
+**b. Veritabanını Kontrol Edin:**
+Oluşturulan logun veritabanına ulaşıp ulaşmadığını kontrol edin. Bu, tüm sistemin başarıyla çalıştığının nihai kanıtıdır. Aşağıdaki komut, veritabanına bağlanıp son 5 logu size gösterecektir.
 ```bash
-make health
+make db-connect
 ```
-
-Expected output:
+Açılan `psql` ekranında şu sorguyu çalıştırın:
+```sql
+SELECT event_id, level, message, service FROM logs ORDER BY timestamp DESC LIMIT 5;
 ```
-🔍 OBSERVABILITY HUB - Health Check
-=================================================
-✅ PostgreSQL is running on localhost:5433
-✅ RabbitMQ is running on localhost:5672
-✅ Jaeger is running on localhost:16686
-✅ Grafana is running on localhost:3000
-✅ Redis is running on localhost:6379
-✅ All services are healthy! 🎉
-```
+Çıktıda `order-service` tarafından oluşturulan logu görmelisiniz.
 
-## 🌐 Service URLs
+### 4. Geliştirme Komutları
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| User Service | http://localhost:3001 | No auth required |
-| RabbitMQ Management | http://localhost:15672 | `obs_user` / `obs_secure_password_2024` |
-| Jaeger UI | http://localhost:16686 | No auth required |
-| Grafana | http://localhost:3000 | `admin` / `admin123` |
-| PostgreSQL | localhost:5433 | `obs_user` / `obs_secure_password_2024` |
-| Redis | localhost:6379 | No auth required |
+`Makefile` geliştirme sürecini kolaylaştıran birçok komut içerir. İşte en sık kullanacaklarınız:
 
-## 🛠️ Development Commands
-
-### Infrastructure Management
-```bash
-make up          # Start all services
-make down        # Stop all services
-make restart     # Restart all services
-make health      # Run health checks
-make logs        # Show all logs
-```
-
-### User Service Management
-```bash
-cd services/user-service
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run test     # Run tests
-npm run lint     # Lint code
-```
-
-### Database Management
-```bash
-make db-connect  # Connect to PostgreSQL
-make db-backup   # Create database backup
-make db-reset    # Reset database (WARNING: deletes data)
-```
-
-### Monitoring & Dashboards
-```bash
-make dashboards     # Open all monitoring UIs
-make rabbitmq-management  # Open RabbitMQ Management
-make jaeger-ui      # Open Jaeger UI
-make grafana-ui     # Open Grafana UI
-```
-
-### Testing & Validation
-```bash
-make test           # Run integration tests
-make test-rabbitmq  # Test RabbitMQ messaging
-make test-postgres  # Test PostgreSQL connection
-make validate       # Validate configurations
-```
-
-### Maintenance
-```bash
-make clean          # Clean up Docker resources
-make clean-all      # Clean everything (WARNING: deletes data)
-make backup-all     # Create complete backup
-make update         # Update all Docker images
-```
-
-## 📊 Database Schema
-
-### Core Tables
-
-| Table | Purpose | Key Features |
-|-------|---------|-------------|
-| `logs` | Store log entries | correlation_id, trace_id, metadata (JSONB) |
-| `metrics` | Store metrics data | name, value, labels (JSONB) |
-| `traces` | Store trace spans | trace_id, span_id, operation_name |
-| `health_checks` | Store health status | service_name, status, response_time |
-| `alerts` | Store alert events | severity, correlation_id, resolved |
-| `dead_letter_queue` | Store failed messages | retry_count, error_message |
-
-### Indexes & Performance
-
-- Optimized indexes for correlation_id, trace_id, timestamps
-- JSONB indexes for metadata queries
-- Automatic updated_at triggers
-- Performance-tuned PostgreSQL configuration
-
-## 🐰 RabbitMQ Configuration
-
-### Exchanges & Queues
-
-| Exchange | Type | Queues | Purpose |
-|----------|------|--------|---------|
-| `logs.topic` | topic | logs.collector, logs.info, logs.warning, logs.error | Log routing |
-| `metrics.topic` | topic | metrics.collector | Metrics collection |
-| `traces.topic` | topic | traces.collector | Trace collection |
-| `alerts.topic` | topic | alerts.processor | Alert processing |
-| `health.topic` | topic | health.monitor | Health monitoring |
-
-### Dead Letter Queues
-
-- Automatic retry mechanism (3 attempts)
-- Failed messages go to DLQ for manual processing
-- TTL and message limits configured
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Key variables in `.env`:
-
-```bash
-# Database
-POSTGRES_DB=observability_db
-POSTGRES_USER=obs_user
-POSTGRES_PASSWORD=obs_secure_password_2024
-
-# RabbitMQ
-RABBITMQ_USER=obs_user
-RABBITMQ_PASSWORD=obs_secure_password_2024
-RABBITMQ_VHOST=/observability
-
-# Monitoring
-JAEGER_UI_PORT=16686
-GRAFANA_PORT=3000
-```
-
-### Performance Tuning
-
-**PostgreSQL:**
-- Shared buffers: 128MB
-- Work memory: 4MB
-- Max connections: 200
-- Optimized checkpoint settings
-
-**RabbitMQ:**
-- Memory high watermark: 60%
-- Max connections: 1000
-- Queue TTL and limits configured
-- HA policies for all queues
-
-**Resource Limits:**
-- PostgreSQL: 512MB RAM limit
-- RabbitMQ: 512MB RAM limit
-- Jaeger: 512MB RAM limit
-- Grafana: 256MB RAM limit
-- Redis: 128MB RAM limit
-
-## 🚨 Health Monitoring
-
-### Automated Health Checks
-
-The system includes comprehensive health monitoring:
-
-1. **Port Availability:** All services listening on expected ports
-2. **Database Connectivity:** PostgreSQL connection and query tests
-3. **Message Broker:** RabbitMQ API and vhost validation
-4. **Tracing System:** Jaeger UI and API responsiveness
-5. **Dashboards:** Grafana health endpoint checks
-6. **Caching:** Redis ping and info commands
-
-### Health Check Script
-
-```bash
-./scripts/health-check.sh
-```
-
-Features:
-- Colored output for easy reading
-- Detailed error reporting
-- Service-specific validation
-- Overall system status
-
-## 🔒 Security Features
-
-### Network Security
-- Isolated Docker network (172.20.0.0/16)
-- No external exposure of internal services
-- Configurable port mappings
-
-### Authentication
-- Default credentials for development
-- Environment-based configuration
-- Production override examples
-
-### Data Protection
-- Persistent volumes for data safety
-- Backup and restore capabilities
-- Graceful shutdown procedures
-
-## 📈 Monitoring & Observability
-
-### Metrics Collection
-- PostgreSQL performance metrics
-- RabbitMQ queue statistics
-- Container resource usage
-- Custom application metrics
-
-### Distributed Tracing
-- Jaeger integration ready
-- Correlation ID tracking
-- Span and trace visualization
-- Service dependency mapping
-
-### Log Aggregation
-- Structured log storage
-- Metadata and context preservation
-- Query optimization
-- Real-time log streaming
-
-## 🚀 Production Deployment
-
-### Prerequisites
-- Docker Swarm or Kubernetes
-- Load balancer for high availability
-- Persistent storage backend
-- Monitoring and alerting system
-
-### Security Hardening
-1. Change default passwords
-2. Enable TLS/SSL encryption
-3. Configure firewall rules
-4. Set up authentication systems
-5. Enable audit logging
-
-### Scaling Considerations
-- Database connection pooling
-- RabbitMQ cluster setup
-- Horizontal service scaling
-- Load balancing configuration
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Services not starting:**
-```bash
-make logs           # Check service logs
-make health-quick   # Quick port check
-docker-compose ps   # Container status
-```
-
-**Database connection failed:**
-```bash
-make db-connect     # Test connection
-make logs-postgres  # Check PostgreSQL logs
-```
-
-**RabbitMQ not accessible:**
-```bash
-make logs-rabbitmq  # Check RabbitMQ logs
-make test-rabbitmq  # Test messaging
-```
-
-**User Service not starting:**
-```bash
-cd services/user-service
-npm run dev         # Check for errors
-npm run build       # Build issues
-```
-
-### Recovery Procedures
-
-**Reset single service:**
-```bash
-docker-compose restart [service-name]
-```
-
-**Complete system reset:**
-```bash
-make clean-all      # WARNING: Deletes all data
-make up             # Restart from clean state
-```
-
-## 📝 Development Notes
-
-### Adding New Services
-1. Add service to `docker-compose.yml`
-2. Update health check script
-3. Add Makefile commands
-4. Update documentation
-
-### Database Migrations
-- Add new migration files to `infrastructure/postgres/init/`
-- Files are executed in alphabetical order
-- Use `02-`, `03-` prefixes for ordering
-
-### Custom Dashboards
-- Add dashboard JSON files to `infrastructure/grafana/dashboards/`
-- Use provisioning for automatic dashboard loading
-- Configure data sources in `infrastructure/grafana/provisioning/`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Test your changes with `make test`
-4. Validate configuration with `make validate`
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🎯 Next Steps
-
-This infrastructure foundation is ready for:
-1. **Additional Microservices** (TypeScript/Node.js)
-2. **Collector Service Implementation** (Go-based message processor)
-3. **Custom Dashboard Creation** (Grafana visualizations)
-4. **Alert Rule Configuration** (Monitoring and alerting)
-5. **Performance Optimization** (Production tuning)
-
-Ready to build your observability platform! 🚀
-
-# Event Contracts & Validation System
+- `make help`: Tüm kullanılabilir komutları ve açıklamalarını listeler.
+- `make down`: Tüm servisleri durdurur.
+- `make restart`: Tüm sistemi yeniden başlatır.
+- `make logs`: Tüm servislerin loglarını canlı olarak gösterir.
+- `make health`: Tüm sistemin sağlık durumunu kontrol eder.
+- `make dashboards`: Tüm gözlemlenebilirlik arayüzlerini (Grafana, Jaeger, RabbitMQ) tarayıcınızda açar.
 
 ## 🎯 **Proje Özeti**
 
@@ -816,4 +513,102 @@ cd golang && go build ./internal/types/...
 
 # Health check
 make health
-``` 
+```
+
+# Observability Hub
+
+Hoş geldiniz! Bu proje, olay tabanlı (event-driven) bir mimari kullanarak tasarlanmış, dayanıklı ve yüksek performanslı bir log toplama ve analiz platformudur. Sistem, log üreten çok sayıda mikroservis, bu logları toplayan merkezi bir servis ve verileri görselleştirmek için kullanılan araçlardan oluşur.
+
+## Projenin Amacı
+
+Bu projenin temel hedefleri şunlardır:
+- **Dayanıklılık:** Yoğun yük altında veya geçici hatalar durumunda bile log verisi kaybını önlemek.
+- **Ölçeklenebilirlik:** Artan log hacmini karşılamak için sistemin kolayca ölçeklenebilmesi.
+- **Gözlemlenebilirlik:** Üretilen her bir log olayının yaşam döngüsünü baştan sona izleyebilmek.
+
+---
+
+## Yeni Geliştiriciler İçin Başlangıç Kılavuzu
+
+Bu kılavuz, projeyi yerel makinenizde sıfırdan ayağa kaldırıp, sistemin temel işlevlerini doğrulamanız için gereken adımları içerir.
+
+### 1. Gereksinimler
+
+Başlamadan önce, makinenizde aşağıdaki araçların yüklü olduğundan emin olun:
+- [Docker](https://www.docker.com/products/docker-desktop/)
+- [Docker Compose](https://docs.docker.com/compose/install/) (Genellikle Docker Desktop ile birlikte gelir)
+- [Git](https://git-scm.com/downloads)
+- `curl` veya Postman gibi bir API test aracı.
+
+### 2. Kurulum
+
+Tüm sistemi yerel ortamınızda ayağa kaldırmak için aşağıdaki adımları izleyin:
+
+**a. Projeyi Klonlayın:**
+```bash
+git clone <repository_url>
+cd observability_hub
+```
+
+**b. Tüm Servisleri Başlatın:**
+Projenin kök dizinindeyken aşağıdaki komutu çalıştırın. Bu komut, tüm servisler (`postgres`, `rabbitmq`, `collector`, `order-service` vb.) için Docker imajlarını oluşturacak (eğer mevcut değilse) ve konteynerleri arka planda (`-d`) başlatacaktır.
+```bash
+docker-compose up --build -d
+```
+
+**c. Konteynerlerin Durumunu Kontrol Edin:**
+Tüm servislerin başarıyla çalışıp çalışmadığını görmek için aşağıdaki komutu kullanın. Tüm servislerin `State` kolonunda `Up` veya `running` yazmalıdır.
+```bash
+docker-compose ps
+```
+
+### 3. Sistemin Çalıştığını Doğrulama (End-to-End Test)
+
+Sistem artık çalışıyor. Şimdi bir log olayının tüm akışını test edelim.
+
+**Adım 1: Bir Log Olayı Tetikleyin**
+`order-service`'e bir HTTP POST isteği göndererek yeni bir sipariş oluşturun. Bu işlem, servis içinde bir log olayının üretilmesine neden olacaktır.
+```bash
+curl -X POST http://localhost:8080/orders \
+-H "Content-Type: application/json" \
+-d '{"productId": "product-12345", "quantity": 2, "user": "faruk"}'
+```
+Bu komut başarılı bir yanıt döndürmelidir.
+
+**Adım 2: Logların Servislerdeki İzini Sürün**
+- **Order Service (Üretici):** `order-service`'in loglarını izleyerek olayın burada üretildiğini görün.
+  ```bash
+  docker-compose logs -f order-service
+  ```
+  Çıktıda "Order created successfully" gibi bir log mesajı görmelisiniz.
+
+- **Collector Service (Toplayıcı):** Şimdi `collector` servisinin loglarını izleyin. Mesajın RabbitMQ'dan alınıp işlendiğini göreceksiniz.
+  ```bash
+  docker-compose logs -f collector
+  ```
+  Çıktıda "Worker X received a message" ve ardından "Successfully flushed X logs to the database" gibi mesajlar görmelisiniz.
+
+**Adım 3: Araçlar Üzerinden Doğrulama**
+- **RabbitMQ Yönetim Arayüzü:**
+  - Tarayıcınızda `http://localhost:15672` adresine gidin.
+  - Kullanıcı adı: `obs_user`, Parola: `obs_password` ile giriş yapın.
+  - "Queues and Streams" sekmesinde `log_events` kuyruğundaki mesaj trafiğini gözlemleyebilirsiniz.
+
+- **PostgreSQL Veritabanı:**
+  - Bir veritabanı istemcisi (DBeaver, TablePlus, pgAdmin vb.) ile aşağıdaki bilgilerle `obs_postgres` veritabanına bağlanın:
+    - **Host:** `localhost`
+    - **Port:** `5433`
+    - **Kullanıcı Adı:** `obs_user`
+    - **Parola:** `obs_password`
+    - **Veritabanı:** `observability_db`
+  - Bağlandıktan sonra, `logs` tablosuna bir sorgu atarak az önce tetiklediğiniz olayın veritabanına yazıldığını doğrulayın:
+    ```sql
+    SELECT event_id, correlation_id, level, message, service FROM logs ORDER BY timestamp DESC LIMIT 5;
+    ```
+
+- **Grafana (Görselleştirme):**
+  - Tarayıcınızda `http://localhost:3000` adresine gidin.
+  - Kullanıcı adı: `admin`, Parola: `admin` ile giriş yapın.
+  - Önceden yapılandırılmış dashboard'larda log verilerinin görselleştirilmiş halini görebilirsiniz.
+
+Tebrikler! Sistemin tüm akışını başarıyla test ettiniz. Artık kod üzerinde değişiklik yapmaya ve geliştirmeye hazırsınız. 
