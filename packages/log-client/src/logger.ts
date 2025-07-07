@@ -413,3 +413,4 @@ export class ObservabilityLogger {
     this.metrics.connectionStatus = 'disconnected';
   }
 }
+ 

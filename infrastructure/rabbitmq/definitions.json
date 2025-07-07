@@ -9,15 +9,7 @@
       "name": "/observability"
     }
   ],
-  "permissions": [
-    {
-      "user": "obs_user",
-      "vhost": "/observability",
-      "configure": ".*",
-      "write": ".*",
-      "read": ".*"
-    }
-  ],
+  "permissions": [],
   "topic_permissions": [],
   "parameters": [],
   "global_parameters": [

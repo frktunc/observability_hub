@@ -57,7 +57,7 @@ stop: ## Stop all services (alias for down)
 
 health: ## Run comprehensive health check
 	@echo "🔍 Running health check..."
-	@./scripts/health-check.sh
+	@docker-compose run --rm health-check
 
 health-quick: ## Quick health check (ports only)
 	@echo "⚡ Quick health check..."
@@ -153,7 +153,7 @@ dashboards: ## Open all monitoring dashboards
 
 test: ## Run integration tests
 	@echo "🧪 Running integration tests..."
-	@./scripts/health-check.sh
+	@docker-compose run --rm health-check
 	@echo "✅ Integration tests completed"
 
 test-rabbitmq: ## Test RabbitMQ message publishing
@@ -253,4 +253,4 @@ urls: ## Show all service URLs
 	@echo "===================="
 	@echo "RabbitMQ: obs_user / obs_secure_password_2024"
 	@echo "Grafana: admin / admin123"
-	@echo "PostgreSQL: obs_user / obs_secure_password_2024" 
+	@echo "PostgreSQL: obs_user / obs_secure_password_2024"

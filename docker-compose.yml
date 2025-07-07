@@ -48,8 +48,9 @@ services:
 
   # RabbitMQ Message Broker
   rabbitmq:
-    image: rabbitmq:3.12-management-alpine
+    image: rabbitmq:3.12-management
     container_name: obs_rabbitmq
+    hostname: obs_rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-obs_user}
@@ -163,7 +164,9 @@ services:
 
   # Health Check Service
   health-check:
-    image: curlimages/curl:latest
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.healthcheck
     container_name: obs_health_check
     restart: "no"
     depends_on:
@@ -174,19 +177,3 @@ services:
       - redis
     networks:
       - observability
-    command: >
-      sh -c "
-        echo 'Waiting for services to be ready...' &&
-        sleep 30 &&
-        echo 'Testing PostgreSQL...' &&
-        until nc -z postgres 5432; do sleep 1; done &&
-        echo 'Testing RabbitMQ...' &&
-        until nc -z rabbitmq 5672; do sleep 1; done &&
-        echo 'Testing Jaeger...' &&
-        until nc -z jaeger 16686; do sleep 1; done &&
-        echo 'Testing Grafana...' &&
-        until nc -z grafana 3000; do sleep 1; done &&
-        echo 'Testing Redis...' &&
-        until nc -z redis 6379; do sleep 1; done &&
-        echo 'All services are ready!'
-      " 

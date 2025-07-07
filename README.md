@@ -6,21 +6,21 @@ Production-ready infrastructure for event-driven logging platform with distribut
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Log Services  │───▶│    RabbitMQ     │───▶│   Collector     │
+│  User Service   │───▶│    RabbitMQ     │───▶│   Collector     │
 │   (TypeScript)  │    │   (Message      │    │   Service (Go)  │
 │                 │    │    Broker)      │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-                                                        │
-                                                        ▼
+        │                       │                       │
+        ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     Grafana     │◀───│   PostgreSQL    │◀───│   Data Store    │
-│   (Dashboards)  │    │   (Database)    │    │                 │
+│  Log Client     │    │   PostgreSQL    │    │   Data Store    │
+│   Library       │    │   (Database)    │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                                         │
                                                         ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│     Jaeger      │◀───│     Redis       │◀───│     Caching     │
-│   (Tracing)     │    │   (Caching)     │    │                 │
+│     Grafana     │◀───│     Redis       │◀───│     Caching     │
+│   (Dashboards)  │    │   (Caching)     │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -55,7 +55,15 @@ This will:
 - Wait for services to be ready
 - Run health checks automatically
 
-### 3. Verify Installation
+### 3. Start User Service
+
+```bash
+cd services/user-service
+npm install
+npm run dev
+```
+
+### 4. Verify Installation
 
 ```bash
 make health
@@ -77,6 +85,7 @@ Expected output:
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
+| User Service | http://localhost:3001 | No auth required |
 | RabbitMQ Management | http://localhost:15672 | `obs_user` / `obs_secure_password_2024` |
 | Jaeger UI | http://localhost:16686 | No auth required |
 | Grafana | http://localhost:3000 | `admin` / `admin123` |
@@ -92,6 +101,15 @@ make down        # Stop all services
 make restart     # Restart all services
 make health      # Run health checks
 make logs        # Show all logs
+```
+
+### User Service Management
+```bash
+cd services/user-service
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run test     # Run tests
+npm run lint     # Lint code
 ```
 
 ### Database Management
@@ -312,6 +330,13 @@ make logs-rabbitmq  # Check RabbitMQ logs
 make test-rabbitmq  # Test messaging
 ```
 
+**User Service not starting:**
+```bash
+cd services/user-service
+npm run dev         # Check for errors
+npm run build       # Build issues
+```
+
 ### Recovery Procedures
 
 **Reset single service:**
@@ -358,13 +383,13 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🎯 Next Steps
 
 This infrastructure foundation is ready for:
-1. **Log Service Development** (TypeScript microservices)
+1. **Additional Microservices** (TypeScript/Node.js)
 2. **Collector Service Implementation** (Go-based message processor)
 3. **Custom Dashboard Creation** (Grafana visualizations)
 4. **Alert Rule Configuration** (Monitoring and alerting)
 5. **Performance Optimization** (Production tuning)
 
-Ready to build your observability platform! 🚀 
+Ready to build your observability platform! 🚀
 
 # Event Contracts & Validation System
 
@@ -417,6 +442,20 @@ Event-driven logging için **comprehensive message contracts ve validation siste
 - Concurrent validation tests
 - Comprehensive test scenarios
 
+### ✅ **8. Log Client Library**
+- `packages/log-client/` - Reusable logging library
+- `@observability-hub/log-client` package
+- ObservabilityLogger sınıfı
+- RabbitMQ integration
+- Business event logging
+
+### ✅ **9. User Service**
+- `services/user-service/` - Business microservice
+- Log client library entegrasyonu
+- Express.js framework
+- Health checks ve metrics
+- Rate limiting ve security
+
 ## 🚀 **Teknik Gereksinimler - ✅ Karşılandı**
 
 | Gereksinim | Durum | Açıklama |
@@ -428,6 +467,8 @@ Event-driven logging için **comprehensive message contracts ve validation siste
 | Backward compatibility | ✅ | Migration stratejisi ile |
 | Performance optimization | ✅ | 35K+ validation/second (Simple), 8K+ (Schema) |
 | Field-level error reporting | ✅ | Detaylı hata bilgileri |
+| Log Client Library | ✅ | Reusable logging solution |
+| Business Microservices | ✅ | User service implementation |
 
 ## 📊 **Başarı Kriterleri - ✅ Karşılandı**
 
@@ -439,6 +480,8 @@ Event-driven logging için **comprehensive message contracts ve validation siste
 | Invalid message rejection | ✅ | Clear error messages |
 | Performance: 10K+ validation/second | ✅ | Benchmark suite ile test edildi |
 | Version migration scenarios | ✅ | Test senaryoları hazırlandı |
+| Log Client Library | ✅ | Production ready |
+| Business Microservice | ✅ | User service çalışıyor |
 
 ## 🎯 **Özel Notlar - ✅ Karşılandı**
 
@@ -449,6 +492,8 @@ Event-driven logging için **comprehensive message contracts ve validation siste
 | Tracing context included | ✅ | Jaeger uyumlu format |
 | Metadata extensibility | ✅ | Additional fields desteği |
 | Multi-service event types | ✅ | Log, Metrics, Trace |
+| Log Client Library | ✅ | `@observability-hub/log-client` |
+| Business Microservice | ✅ | User service with observability |
 
 ## 🔧 **Kullanım**
 
@@ -538,6 +583,34 @@ service EventCollectorService {
 }
 ```
 
+### Log Client Library Usage
+```typescript
+import { ObservabilityLogger } from '@observability-hub/log-client';
+
+const logger = new ObservabilityLogger({
+  serviceName: 'user-service',
+  serviceVersion: '1.0.0',
+  environment: 'development',
+  rabbitmqUrl: 'amqp://localhost:5672',
+});
+
+// Log usage
+await logger.info('User created', {
+  operation: 'create_user',
+  userId: '123',
+  correlationId: 'corr-123',
+});
+
+// Business event
+await logger.businessEvent({
+  eventType: 'user.created',
+  aggregateId: '123',
+  aggregateType: 'User',
+  correlationId: 'corr-123',
+  data: { userId: '123', email: 'user@example.com' },
+});
+```
+
 ## 🧪 **Testing**
 
 ### Performance Benchmark
@@ -574,10 +647,35 @@ npm run test
 npm run test:coverage
 ```
 
+### User Service Tests
+```bash
+# User service testleri
+cd services/user-service
+npm run test
+npm run test:coverage
+```
+
 ## 📁 **Proje Yapısı**
 
 ```
 observability_hub/
+├── packages/
+│   └── log-client/              # Log client library
+│       ├── src/
+│       │   ├── index.ts
+│       │   ├── logger.ts
+│       │   └── types.ts
+│       └── package.json
+├── services/
+│   └── user-service/            # Business microservice
+│       ├── src/
+│       │   ├── app.ts
+│       │   ├── index.ts
+│       │   ├── config/
+│       │   ├── middleware/
+│       │   ├── routes/
+│       │   └── services/
+│       └── package.json
 ├── contracts/
 │   ├── schemas/                    # JSON Schema definitions (4 files)
 │   │   ├── base-event.schema.json
@@ -670,6 +768,8 @@ const compatible = isVersionCompatible("1.0.0", "1.1.0"); // true
 - ✅ [gRPC Service Definition](proto/events/)
 - ✅ [Versioning Strategy](contracts/versioning-strategy.md)
 - ✅ [Performance Benchmarks](tests/performance/)
+- ✅ [Log Client Library](packages/log-client/)
+- ✅ [User Service](services/user-service/)
 
 ## 🎉 **Sonuç**
 
@@ -685,13 +785,17 @@ const compatible = isVersionCompatible("1.0.0", "1.1.0"); // true
 - ✅ **gRPC support** ile high-performance communication
 - ✅ **Version migration** framework
 - ✅ **Comprehensive testing** suite
+- ✅ **Log Client Library** - Reusable logging solution
+- ✅ **Business Microservice** - User service with observability
 
 Sistem production-ready durumda ve TypeScript producer'lar ile Go collector arasında **sıkı typed communication** sağlamaktadır.
 
 ### 🔗 **Quick Links:**
 - 📦 **TypeScript Package:** `@observability-hub/event-contracts`
+- 📦 **Log Client:** `@observability-hub/log-client`
 - 🏃‍♂️ **Performance Test:** `cd typescript && npm run test:performance`
 - 🧪 **Tüm Testler:** `cd typescript && npm run test:coverage`
+- 🚀 **User Service:** `cd services/user-service && npm run dev`
 - 🐘 **Database:** `make db-connect`
 - 🐰 **RabbitMQ UI:** `make rabbitmq-management`
 - 📊 **Monitoring:** `make dashboards`
@@ -700,6 +804,9 @@ Sistem production-ready durumda ve TypeScript producer'lar ile Go collector aras
 ```bash
 # Infrastructure'ı başlat
 make up
+
+# User service'i başlat
+cd services/user-service && npm install && npm run dev
 
 # TypeScript testlerini çalıştır
 cd typescript && npm install && npm run test:performance

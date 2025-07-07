@@ -17,7 +17,7 @@ const configSchema = z.object({
   SERVICE_INSTANCE_ID: z.string().optional(),
   
   // RabbitMQ Configuration
-  RABBITMQ_URL: z.string().default('amqp://obs_user:obs_secure_password_2024@localhost:5672'),
+  RABBITMQ_URL: z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
   RABBITMQ_VHOST: z.string().default('/observability'),
   RABBITMQ_EXCHANGE: z.string().default('logs.topic'),
   RABBITMQ_CONNECTION_TIMEOUT: z.coerce.number().default(30000),

@@ -95,7 +95,7 @@ function createApp() {
         const speedLimiter = (0, express_slow_down_1.default)({
             windowMs: config_1.config.RATE_LIMIT_WINDOW_MS,
             delayAfter: Math.floor(config_1.config.RATE_LIMIT_MAX_REQUESTS * 0.5),
-            delayMs: 500,
+            delayMs: () => 500,
             maxDelayMs: 20000,
         });
         app.use(speedLimiter);
