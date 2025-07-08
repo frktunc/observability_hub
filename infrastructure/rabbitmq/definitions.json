@@ -17,7 +17,7 @@
   ],
   "vhosts": [
     {
-      "name": "/observability"
+      "name": "observability"
     },
     {
       "name": "/"
@@ -26,7 +26,7 @@
   "permissions": [
     {
       "user": "obs_user",
-      "vhost": "/observability",
+      "vhost": "observability",
       "configure": ".*",
       "write": ".*",
       "read": ".*"
@@ -40,7 +40,7 @@
     },
     {
       "user": "guest",
-      "vhost": "/observability",
+      "vhost": "observability",
       "configure": ".*",
       "write": ".*",
       "read": ".*"
@@ -63,7 +63,7 @@
   ],
   "policies": [
     {
-      "vhost": "/observability",
+      "vhost": "observability",
       "name": "logs-ha-policy",
       "pattern": "^logs\\.",
       "apply-to": "queues",
@@ -76,7 +76,7 @@
       "priority": 10
     },
     {
-      "vhost": "/observability",
+      "vhost": "observability",
       "name": "metrics-ha-policy",
       "pattern": "^metrics\\.",
       "apply-to": "queues",
@@ -89,7 +89,7 @@
       "priority": 10
     },
     {
-      "vhost": "/observability",
+      "vhost": "observability",
       "name": "traces-ha-policy",
       "pattern": "^traces\\.",
       "apply-to": "queues",
@@ -105,7 +105,7 @@
   "exchanges": [
     {
       "name": "logs.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -114,7 +114,7 @@
     },
     {
       "name": "metrics.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -123,7 +123,7 @@
     },
     {
       "name": "traces.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -132,7 +132,7 @@
     },
     {
       "name": "alerts.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -141,7 +141,7 @@
     },
     {
       "name": "health.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "topic",
       "durable": true,
       "auto_delete": false,
@@ -150,7 +150,7 @@
     },
     {
       "name": "dlx.logs",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "direct",
       "durable": true,
       "auto_delete": false,
@@ -159,7 +159,7 @@
     },
     {
       "name": "dlx.metrics",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "direct",
       "durable": true,
       "auto_delete": false,
@@ -168,7 +168,7 @@
     },
     {
       "name": "dlx.traces",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "direct",
       "durable": true,
       "auto_delete": false,
@@ -177,7 +177,7 @@
     },
     {
       "name": "log_events_dlx",
-      "vhost": "/observability",
+      "vhost": "observability",
       "type": "direct",
       "durable": true,
       "auto_delete": false,
@@ -188,7 +188,7 @@
   "queues": [
     {
       "name": "logs.collector",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -200,7 +200,7 @@
     },
     {
       "name": "logs.info",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -212,7 +212,7 @@
     },
     {
       "name": "logs.warning",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -224,7 +224,7 @@
     },
     {
       "name": "logs.error",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -236,7 +236,7 @@
     },
     {
       "name": "metrics.collector",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -248,7 +248,7 @@
     },
     {
       "name": "traces.collector",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -260,7 +260,7 @@
     },
     {
       "name": "alerts.processor",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -269,7 +269,7 @@
     },
     {
       "name": "health.monitor",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -278,28 +278,28 @@
     },
     {
       "name": "dlq.logs",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
     },
     {
       "name": "dlq.metrics",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
     },
     {
       "name": "dlq.traces",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
     },
     {
       "name": "log_events",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {
@@ -308,7 +308,7 @@
     },
     {
       "name": "log_events_dlq",
-      "vhost": "/observability",
+      "vhost": "observability",
       "durable": true,
       "auto_delete": false,
       "arguments": {}
@@ -317,7 +317,7 @@
   "bindings": [
     {
       "source": "logs.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "logs.collector",
       "destination_type": "queue",
       "routing_key": "logs.#",
@@ -325,7 +325,7 @@
     },
     {
       "source": "logs.topic",
-      "vhost": "/observability", 
+      "vhost": "observability", 
       "destination": "logs.info",
       "destination_type": "queue",
       "routing_key": "logs.info",
@@ -333,7 +333,7 @@
     },
     {
       "source": "logs.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "logs.warning", 
       "destination_type": "queue",
       "routing_key": "logs.warning",
@@ -341,7 +341,7 @@
     },
     {
       "source": "logs.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "logs.error",
       "destination_type": "queue", 
       "routing_key": "logs.error",
@@ -349,7 +349,7 @@
     },
     {
       "source": "metrics.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "metrics.collector",
       "destination_type": "queue",
       "routing_key": "metrics.#",
@@ -357,7 +357,7 @@
     },
     {
       "source": "traces.topic", 
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "traces.collector",
       "destination_type": "queue",
       "routing_key": "traces.#",
@@ -365,7 +365,7 @@
     },
     {
       "source": "alerts.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "alerts.processor",
       "destination_type": "queue",
       "routing_key": "alerts.#",
@@ -373,7 +373,7 @@
     },
     {
       "source": "health.topic",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "health.monitor",
       "destination_type": "queue",
       "routing_key": "health.#",
@@ -381,7 +381,7 @@
     },
     {
       "source": "log_events_dlx",
-      "vhost": "/observability",
+      "vhost": "observability",
       "destination": "log_events_dlq",
       "destination_type": "queue",
       "routing_key": "",

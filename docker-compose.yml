@@ -65,7 +65,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-obs_user}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-obs_password}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/observability}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-observability}
       RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-observability_cookie}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -96,7 +96,7 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-/observability}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-observability}
       - POSTGRES_URL=postgres://${POSTGRES_USER:-obs_user}:${POSTGRES_PASSWORD:-obs_password}@postgres:5432/${POSTGRES_DB:-observability_db}?sslmode=disable
       - COLLECTOR_BATCH_SIZE=500
       - COLLECTOR_BATCH_TIMEOUT=5s
@@ -249,7 +249,7 @@ services:
       - RABBITMQ_HOSTNAME=rabbitmq
       - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-obs_password}
-      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/observability}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-observability}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
     ports:
@@ -281,7 +281,7 @@ services:
       - RABBITMQ_HOSTNAME=rabbitmq
       - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-obs_password}
-      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/observability}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-observability}
       - DATABASE_URL=postgresql://${USER_SERVICE_DB_USER:-user_service_user}:${USER_SERVICE_DB_PASSWORD:-user_service_password}@user_service_db:5432/${USER_SERVICE_DB_NAME:-user_service_db}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
