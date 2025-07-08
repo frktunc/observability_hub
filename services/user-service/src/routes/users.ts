@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { ObservabilityLogger } from '@observability-hub/log-client';
 import { v4 as uuidv4 } from 'uuid';
+import { ObservabilityLogger } from '@observability-hub/log-client';
+import { config, derivedConfig } from '../config';
 
 // Mock user data (gerçek projede database kullanılır)
 const users: any[] = [
@@ -24,8 +25,13 @@ const router = Router();
 
 // Initialize logger
 const logger = new ObservabilityLogger({
-  serviceName: 'user-service',
-  rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
+  serviceName: config.SERVICE_NAME,
+  serviceVersion: config.SERVICE_VERSION,
+  environment: config.NODE_ENV,
+  rabbitmqUrl: derivedConfig.rabbitmq.url,
+  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
+  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
+  defaultLogLevel: config.LOG_LEVEL as any,
 });
 
 // GET /api/v1/users - List all users

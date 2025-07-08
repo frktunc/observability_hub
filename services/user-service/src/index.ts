@@ -1,15 +1,16 @@
 import { createApp } from './app';
-import { config } from './config';
+import { config, derivedConfig } from './config';
 import { ObservabilityLogger } from '@observability-hub/log-client';
 
 // Initialize observability logger
 const logger = new ObservabilityLogger({
-  serviceName: 'user-service',
+  serviceName: config.SERVICE_NAME,
   serviceVersion: config.SERVICE_VERSION,
   environment: config.NODE_ENV,
-  rabbitmqUrl: config.RABBITMQ_URL,
-  rabbitmqVhost: config.RABBITMQ_VHOST,
-  rabbitmqExchange: config.RABBITMQ_EXCHANGE,
+  rabbitmqUrl: derivedConfig.rabbitmq.url,
+  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
+  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
+  defaultLogLevel: config.LOG_LEVEL as any,
 });
 
 async function startServer() {

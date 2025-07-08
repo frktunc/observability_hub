@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 
 import { ObservabilityLogger } from '@observability-hub/log-client';
-import { config } from './config';
+import { config, derivedConfig } from './config';
 import { metricsMiddleware, metricsRegistry } from './middleware/metrics';
 import { requestLoggingMiddleware } from './middleware/request-logging';
 import { errorHandler } from './middleware/error-handler';
@@ -17,12 +17,13 @@ import { metricsRoutes } from './routes/metrics';
 
 // Initialize observability logger
 const logger = new ObservabilityLogger({
-  serviceName: 'user-service',
+  serviceName: config.SERVICE_NAME,
   serviceVersion: config.SERVICE_VERSION,
   environment: config.NODE_ENV,
-  rabbitmqUrl: config.RABBITMQ_URL,
-  rabbitmqVhost: config.RABBITMQ_VHOST,
-  rabbitmqExchange: config.RABBITMQ_EXCHANGE,
+  rabbitmqUrl: derivedConfig.rabbitmq.url,
+  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
+  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
+  defaultLogLevel: config.LOG_LEVEL as any,
 });
 
 export function createApp(): express.Application {
