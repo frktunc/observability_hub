@@ -115,11 +115,7 @@ export interface HealthStatus {
             latency?: number;
             error?: string;
         };
-        grpc: {
-            status: 'listening' | 'error';
-            port: number;
-            error?: string;
-        };
+       
         memory: {
             used: number;
             limit: number;

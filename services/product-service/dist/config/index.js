@@ -30,12 +30,6 @@ const configSchema = zod_1.z.object({
     RABBITMQ_HEARTBEAT: zod_1.z.coerce.number().default(60),
     RABBITMQ_MAX_RETRIES: zod_1.z.coerce.number().default(5),
     RABBITMQ_RETRY_DELAY: zod_1.z.coerce.number().default(2000),
-    GRPC_PORT: zod_1.z.coerce.number().min(1).max(65535).default(50053),
-    GRPC_HOST: zod_1.z.string().default('0.0.0.0'),
-    GRPC_MAX_RECEIVE_MESSAGE_LENGTH: zod_1.z.coerce.number().default(4 * 1024 * 1024),
-    GRPC_MAX_SEND_MESSAGE_LENGTH: zod_1.z.coerce.number().default(4 * 1024 * 1024),
-    GRPC_KEEPALIVE_TIME: zod_1.z.coerce.number().default(30000),
-    GRPC_KEEPALIVE_TIMEOUT: zod_1.z.coerce.number().default(5000),
     LOG_LEVEL: zod_1.z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info'),
     LOG_FORMAT: zod_1.z.enum(['json', 'pretty']).default('json'),
     LOG_MAX_FILE_SIZE: zod_1.z.string().default('20m'),
@@ -84,7 +78,6 @@ exports.derivedConfig = {
     isDevelopment: exports.config.NODE_ENV === 'development',
     isProduction: exports.config.NODE_ENV === 'production',
     httpUrl: `http://${exports.config.HOST}:${exports.config.PORT}`,
-    grpcUrl: `${exports.config.GRPC_HOST}:${exports.config.GRPC_PORT}`,
     metricsUrl: `http://${exports.config.HOST}:${exports.config.METRICS_PORT}${exports.config.METRICS_PATH}`,
     database: {
         url: exports.config.DATABASE_URL,
@@ -119,18 +112,6 @@ exports.derivedConfig = {
             retryDelayMs: exports.config.RABBITMQ_RETRY_DELAY,
         }
     },
-    grpc: {
-        options: {
-            'grpc.keepalive_time_ms': exports.config.GRPC_KEEPALIVE_TIME,
-            'grpc.keepalive_timeout_ms': exports.config.GRPC_KEEPALIVE_TIMEOUT,
-            'grpc.keepalive_permit_without_calls': true,
-            'grpc.http2.max_pings_without_data': 0,
-            'grpc.http2.min_time_between_pings_ms': 10000,
-            'grpc.http2.min_ping_interval_without_data_ms': 5 * 60 * 1000,
-            'grpc.max_receive_message_length': exports.config.GRPC_MAX_RECEIVE_MESSAGE_LENGTH,
-            'grpc.max_send_message_length': exports.config.GRPC_MAX_SEND_MESSAGE_LENGTH,
-        }
-    }
 };
 const validateConfiguration = () => {
     console.log('🔧 Configuration validated successfully');

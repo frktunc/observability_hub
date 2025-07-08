@@ -59,7 +59,7 @@ export declare const derivedConfig: {
     isDevelopment: boolean;
     isProduction: boolean;
     httpUrl: string;
-    grpcUrl: string;
+ 
     metricsUrl: string;
     database: {
         url: string;
@@ -92,18 +92,6 @@ export declare const derivedConfig: {
         retryOptions: {
             maxRetries: number;
             retryDelayMs: number;
-        };
-    };
-    grpc: {
-        options: {
-            'grpc.keepalive_time_ms': number;
-            'grpc.keepalive_timeout_ms': number;
-            'grpc.keepalive_permit_without_calls': boolean;
-            'grpc.http2.max_pings_without_data': number;
-            'grpc.http2.min_time_between_pings_ms': number;
-            'grpc.http2.min_ping_interval_without_data_ms': number;
-            'grpc.max_receive_message_length': number;
-            'grpc.max_send_message_length': number;
         };
     };
 };

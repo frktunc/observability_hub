@@ -126,11 +126,6 @@ Event-driven logging için **comprehensive message contracts ve validation siste
 - Migration framework
 - Version lifecycle management
 
-### ✅ **6. Proto Definitions (gRPC)**
-- `proto/events/observability.proto` - Tam gRPC service definition
-- TypeScript ve Go code generation ready
-- Performance optimizations
-- Streaming support
 
 ### ✅ **7. Contract Testing Framework**
 - `tests/performance/validation-benchmark.ts` - Performance benchmark suite
@@ -271,14 +266,6 @@ if err != nil {
 }
 ```
 
-### gRPC Communication
-```proto
-// Proto file'dan generate edilen service
-service EventCollectorService {
-  rpc SubmitEvent(SubmitEventRequest) returns (SubmitEventResponse);
-  rpc SubmitEventBatch(SubmitEventBatchRequest) returns (SubmitEventBatchResponse);
-}
-```
 
 ### Log Client Library Usage
 ```typescript
@@ -336,8 +323,7 @@ npm run test:contracts
 # Version migration tests  
 npm run test:migration
 
-# gRPC contract tests
-npm run test:grpc
+
 
 # Tüm testleri çalıştır
 npm run test
@@ -462,7 +448,6 @@ const compatible = isVersionCompatible("1.0.0", "1.1.0"); // true
 - ✅ [JSON Schema Specifications](contracts/schemas/)
 - ✅ [TypeScript API Documentation](typescript/src/)
 - ✅ [Go API Documentation](golang/internal/types/)
-- ✅ [gRPC Service Definition](proto/events/)
 - ✅ [Versioning Strategy](contracts/versioning-strategy.md)
 - ✅ [Performance Benchmarks](tests/performance/)
 - ✅ [Log Client Library](packages/log-client/)
@@ -479,7 +464,6 @@ const compatible = isVersionCompatible("1.0.0", "1.1.0"); // true
 - ✅ **10K+ validation/second** performance
 - ✅ **Backward compatibility** garantisi
 - ✅ **Field-level error reporting**
-- ✅ **gRPC support** ile high-performance communication
 - ✅ **Version migration** framework
 - ✅ **Comprehensive testing** suite
 - ✅ **Log Client Library** - Reusable logging solution

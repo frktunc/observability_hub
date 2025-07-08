@@ -98,23 +98,6 @@ export interface ProducerMetrics {
   lastMessageTimestamp?: string;
 }
 
-// gRPC service types
-export interface LogServiceRequest {
-  message: LogMessage;
-  options?: {
-    timeout?: number;
-    retries?: number;
-  };
-}
-
-export interface LogServiceBatchRequest {
-  batch: BatchLogRequest;
-  options?: {
-    timeout?: number;
-    retries?: number;
-  };
-}
-
 // Circuit breaker states
 export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
@@ -134,11 +117,6 @@ export interface HealthStatus {
     rabbitmq: {
       status: 'connected' | 'disconnected' | 'error';
       latency?: number;
-      error?: string;
-    };
-    grpc: {
-      status: 'listening' | 'error';
-      port: number;
       error?: string;
     };
     memory: {
@@ -190,4 +168,4 @@ export interface RateLimitedRequest {
   clientId: string;
   endpoint: string;
   timestamp: Date;
-} 
+}

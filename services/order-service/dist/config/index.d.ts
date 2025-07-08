@@ -20,12 +20,6 @@ export declare const config: {
     RABBITMQ_HEARTBEAT: number;
     RABBITMQ_MAX_RETRIES: number;
     RABBITMQ_RETRY_DELAY: number;
-    GRPC_PORT: number;
-    GRPC_HOST: string;
-    GRPC_MAX_RECEIVE_MESSAGE_LENGTH: number;
-    GRPC_MAX_SEND_MESSAGE_LENGTH: number;
-    GRPC_KEEPALIVE_TIME: number;
-    GRPC_KEEPALIVE_TIMEOUT: number;
     LOG_LEVEL: "error" | "warn" | "info" | "debug" | "trace";
     LOG_FORMAT: "json" | "pretty";
     LOG_MAX_FILE_SIZE: string;
@@ -59,7 +53,7 @@ export declare const derivedConfig: {
     isDevelopment: boolean;
     isProduction: boolean;
     httpUrl: string;
-    grpcUrl: string;
+   
     metricsUrl: string;
     database: {
         url: string;
@@ -94,18 +88,7 @@ export declare const derivedConfig: {
             retryDelayMs: number;
         };
     };
-    grpc: {
-        options: {
-            'grpc.keepalive_time_ms': number;
-            'grpc.keepalive_timeout_ms': number;
-            'grpc.keepalive_permit_without_calls': boolean;
-            'grpc.http2.max_pings_without_data': number;
-            'grpc.http2.min_time_between_pings_ms': number;
-            'grpc.http2.min_ping_interval_without_data_ms': number;
-            'grpc.max_receive_message_length': number;
-            'grpc.max_send_message_length': number;
-        };
-    };
+   
 };
 export declare const validateConfiguration: () => void;
 export type Config = typeof config;
