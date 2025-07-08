@@ -89,6 +89,7 @@ export interface LogClientConfig {
   rabbitmqHostname?: string;
   rabbitmqPort?: number;
   
+  
   // RabbitMQ Configuration
   rabbitmqUsername?: string;
   rabbitmqPassword?: string;
