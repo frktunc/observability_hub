@@ -40,14 +40,7 @@ const configSchema = z.object({
   RABBITMQ_MAX_RETRIES: z.coerce.number().default(5),
   RABBITMQ_RETRY_DELAY: z.coerce.number().default(2000),
   
-  // gRPC Configuration  
-  GRPC_PORT: z.coerce.number().min(1).max(65535).default(50052),
-  GRPC_HOST: z.string().default('0.0.0.0'),
-  GRPC_MAX_RECEIVE_MESSAGE_LENGTH: z.coerce.number().default(4 * 1024 * 1024), // 4MB
-  GRPC_MAX_SEND_MESSAGE_LENGTH: z.coerce.number().default(4 * 1024 * 1024), // 4MB
-  GRPC_KEEPALIVE_TIME: z.coerce.number().default(30000),
-  GRPC_KEEPALIVE_TIMEOUT: z.coerce.number().default(5000),
-  
+
   // Logging Configuration
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info'),
   LOG_FORMAT: z.enum(['json', 'pretty']).default('json'),
@@ -117,7 +110,6 @@ export const derivedConfig = {
   
   // Service URLs
   httpUrl: `http://${config.HOST}:${config.PORT}`,
-  grpcUrl: `${config.GRPC_HOST}:${config.GRPC_PORT}`,
   metricsUrl: `http://${config.HOST}:${config.METRICS_PORT}${config.METRICS_PATH}`,
   
   // Database configuration
@@ -161,19 +153,6 @@ export const derivedConfig = {
     }
   },
   
-  // gRPC options
-  grpc: {
-    options: {
-      'grpc.keepalive_time_ms': config.GRPC_KEEPALIVE_TIME,
-      'grpc.keepalive_timeout_ms': config.GRPC_KEEPALIVE_TIMEOUT,
-      'grpc.keepalive_permit_without_calls': true,
-      'grpc.http2.max_pings_without_data': 0,
-      'grpc.http2.min_time_between_pings_ms': 10000,
-      'grpc.http2.min_ping_interval_without_data_ms': 5 * 60 * 1000,
-      'grpc.max_receive_message_length': config.GRPC_MAX_RECEIVE_MESSAGE_LENGTH,
-      'grpc.max_send_message_length': config.GRPC_MAX_SEND_MESSAGE_LENGTH,
-    }
-  }
 };
 
 // Configuration validation and startup info
@@ -184,7 +163,6 @@ export const validateConfiguration = (): void => {
     console.log('📋 Configuration summary:');
     console.log(`  Service: ${config.SERVICE_NAME}@${config.SERVICE_VERSION}`);
     console.log(`  HTTP: ${derivedConfig.httpUrl}`);
-    console.log(`  gRPC: ${derivedConfig.grpcUrl}`);
     console.log(`  Environment: ${config.NODE_ENV}`);
     console.log(`  Log Level: ${config.LOG_LEVEL}`);
     console.log(`  RabbitMQ: ${config.RABBITMQ_URL}`);
