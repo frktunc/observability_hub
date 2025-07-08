@@ -28,8 +28,12 @@ const configSchema = z.object({
   DATABASE_TIMEOUT: z.coerce.number().default(5000),
   
   // RabbitMQ Configuration
-  RABBITMQ_URL: z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
-  RABBITMQ_VHOST: z.string().default('/observability'),
+  RABBITMQ_URL: z.string().nonempty(),
+  RABBITMQ_HOSTNAME: z.string().default('rabbitmq'),
+  RABBITMQ_PORT: z.coerce.number().default(5672),
+  RABBITMQ_USER: z.string().default('obs_user'),
+  RABBITMQ_PASSWORD: z.string().default('obs_password'),
+  RABBITMQ_VHOST: z.string().nonempty(),
   RABBITMQ_EXCHANGE: z.string().default('logs.topic'),
   RABBITMQ_CONNECTION_TIMEOUT: z.coerce.number().default(30000),
   RABBITMQ_HEARTBEAT: z.coerce.number().default(60),
@@ -134,6 +138,10 @@ export const derivedConfig = {
   // RabbitMQ routing
   rabbitmq: {
     url: config.RABBITMQ_URL,
+    hostname: config.RABBITMQ_HOSTNAME,
+    port: config.RABBITMQ_PORT,
+    user: config.RABBITMQ_USER,
+    password: config.RABBITMQ_PASSWORD,
     vhost: config.RABBITMQ_VHOST,
     exchange: config.RABBITMQ_EXCHANGE,
     routingKeys: {

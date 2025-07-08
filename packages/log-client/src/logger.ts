@@ -19,7 +19,11 @@ import {
 export class ObservabilityLogger {
   private connection: any = null;
   private channel: any = null;
-  private config: Required<LogClientConfig>;
+  private config: Required<Omit<LogClientConfig, 'rabbitmqUsername' | 'rabbitmqPassword' | 'rabbitmqUrl'>> & {
+    rabbitmqUrl?: string;
+    rabbitmqUsername?: string;
+    rabbitmqPassword?: string;
+  };
   private isConnected = false;
   private reconnectAttempts = 0;
   private metrics: ClientMetrics;
@@ -32,10 +36,12 @@ export class ObservabilityLogger {
   constructor(config: LogClientConfig) {
     // Set default configuration
     this.config = {
+      ...config,
       serviceName: config.serviceName,
       serviceVersion: config.serviceVersion || '1.0.0',
       environment: config.environment || 'development',
-      rabbitmqUrl: config.rabbitmqUrl,
+      rabbitmqHostname: config.rabbitmqHostname || 'localhost',
+      rabbitmqPort: config.rabbitmqPort || 5672,
       rabbitmqVhost: config.rabbitmqVhost || '/observability',
       rabbitmqExchange: config.rabbitmqExchange || 'logs.topic',
       connectionTimeout: config.connectionTimeout || 30000,
@@ -66,10 +72,28 @@ export class ObservabilityLogger {
   // Connection management
   private async connect(): Promise<void> {
     try {
-      this.connection = await connect(this.config.rabbitmqUrl, {
-        heartbeat: this.config.heartbeat,
-        timeout: this.config.connectionTimeout,
-      });
+      const {
+        rabbitmqHostname,
+        rabbitmqPort,
+        rabbitmqUsername,
+        rabbitmqPassword,
+        rabbitmqVhost,
+        heartbeat,
+        connectionTimeout,
+      } = this.config;
+  
+      const connOptions = {
+        protocol: 'amqp',
+        hostname: rabbitmqHostname,
+        port: rabbitmqPort,
+        username: rabbitmqUsername,
+        password: rabbitmqPassword,
+        vhost: rabbitmqVhost,
+        heartbeat: heartbeat,
+        timeout: connectionTimeout,
+      };
+
+      this.connection = await connect(connOptions);
 
       this.channel = await this.connection.createChannel();
       

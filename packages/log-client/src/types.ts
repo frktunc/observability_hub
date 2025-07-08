@@ -84,10 +84,14 @@ export interface SecurityEvent {
 export interface LogClientConfig {
   serviceName: string;
   serviceVersion?: string;
-  environment?: 'development' | 'staging' | 'production';
+  environment?: string;
+  rabbitmqUrl?: string; // Keep for backward compatibility or simple setups
+  rabbitmqHostname?: string;
+  rabbitmqPort?: number;
   
   // RabbitMQ Configuration
-  rabbitmqUrl: string;
+  rabbitmqUsername?: string;
+  rabbitmqPassword?: string;
   rabbitmqVhost?: string;
   rabbitmqExchange?: string;
   

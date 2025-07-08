@@ -2,6 +2,7 @@ networks:
   observability:
     driver: bridge
     ipam:
+      driver: default
       config:
         - subnet: 172.20.0.0/16
 
@@ -52,10 +53,15 @@ services:
 
   # RabbitMQ Message Broker
   rabbitmq:
-    image: rabbitmq:3.12-management
+    image: rabbitmq:3.13-management-alpine
     container_name: obs_rabbitmq
-    hostname: obs_rabbitmq
     restart: unless-stopped
+    networks:
+      observability:
+        ipv4_address: 172.20.0.10
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-obs_user}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-obs_password}
@@ -65,11 +71,6 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./infrastructure/rabbitmq/config:/etc/rabbitmq
       - ./infrastructure/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
-    networks:
-      - observability
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 30s
@@ -233,22 +234,26 @@ services:
   order-service:
     build:
       context: .
-      dockerfile: services/order-service/Dockerfile
+      dockerfile: ./services/order-service/Dockerfile
     container_name: obs_order_service
     restart: unless-stopped
     depends_on:
       - rabbitmq
       - jaeger
+    networks:
+      - observability
     environment:
       - NODE_ENV=development
       - PORT=8080
-      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@rabbitmq:5672/${RABBITMQ_VHOST:-observability}
+      - RABBITMQ_URL=amqp://rabbitmq:5672 # Fallback/legacy
+      - RABBITMQ_HOSTNAME=rabbitmq
+      - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-obs_password}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-observability}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
     ports:
       - "8080:8080"
-    networks:
-      - observability
     deploy:
       resources:
         limits:
