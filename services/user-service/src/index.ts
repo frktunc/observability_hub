@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { config, derivedConfig } from './config';
 import { ObservabilityLogger } from '@observability-hub/log-client';
+import { db } from './services/database';
 
 // Initialize observability logger
 const logger = new ObservabilityLogger({
@@ -15,6 +16,11 @@ const logger = new ObservabilityLogger({
 
 async function startServer() {
   try {
+    // Initialize database connection first
+    console.log('🔗 Initializing database connection...');
+    await db.connect();
+    console.log('✅ Database connected and schema initialized');
+
     const app = createApp();
     
     // Start the server
@@ -24,12 +30,14 @@ async function startServer() {
         port: config.PORT,
         environment: config.NODE_ENV,
         serviceVersion: config.SERVICE_VERSION,
+        databaseStatus: db.getConnectionStatus(),
       });
       
       console.log(`🚀 User Service is running on port ${config.PORT}`);
       console.log(`📊 Health check: http://localhost:${config.PORT}/health`);
       console.log(`📈 Metrics: http://localhost:${config.PORT}/metrics`);
       console.log(`👥 Users API: http://localhost:${config.PORT}/api/v1/users`);
+      console.log(`💾 Database: Connected and ready`);
     });
 
     // Graceful shutdown
@@ -39,7 +47,15 @@ async function startServer() {
         signal,
       });
 
-      server.close(() => {
+      server.close(async () => {
+        // Disconnect database
+        try {
+          await db.disconnect();
+          console.log('💾 Database disconnected');
+        } catch (error) {
+          console.error('Error disconnecting database:', error);
+        }
+
         logger.info('Server closed', {
           component: 'server',
         });
@@ -73,6 +89,7 @@ async function startServer() {
     logger.error('Failed to start server', error as Error, {
       component: 'server',
     });
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 }
