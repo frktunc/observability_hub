@@ -2,16 +2,20 @@ import { Router, Request, Response } from 'express';
 import { ObservabilityLogger } from '@observability-hub/log-client';
 import { Order, CreateOrderRequest, UpdateOrderRequest } from '../types/order';
 import { v4 as uuidv4 } from 'uuid';
+import { config, derivedConfig } from '../config';
 
 const router = Router();
 const logger = new ObservabilityLogger({
-  serviceName: 'order-service',
-  serviceVersion: '1.0.0',
-  environment: 'development',
-  rabbitmqUrl: 'amqp://localhost:5672',
-  rabbitmqVhost: '/',
-  rabbitmqExchange: 'logs',
-  defaultLogLevel: 'INFO' as any,
+  serviceName: config.SERVICE_NAME,
+  serviceVersion: config.SERVICE_VERSION,
+  environment: config.NODE_ENV,
+  rabbitmqHostname: derivedConfig.rabbitmq.hostname,
+  rabbitmqPort: derivedConfig.rabbitmq.port,
+  rabbitmqUsername: derivedConfig.rabbitmq.user,
+  rabbitmqPassword: derivedConfig.rabbitmq.password,
+  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
+  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
+  defaultLogLevel: config.LOG_LEVEL as any,
 });
 
 const orders: Map<string, Order> = new Map();

@@ -74,8 +74,12 @@ export interface SecurityEvent {
 export interface LogClientConfig {
     serviceName: string;
     serviceVersion?: string;
-    environment?: 'development' | 'staging' | 'production';
-    rabbitmqUrl: string;
+    environment?: string;
+    rabbitmqUrl?: string;
+    rabbitmqHostname?: string;
+    rabbitmqPort?: number;
+    rabbitmqUsername?: string;
+    rabbitmqPassword?: string;
     rabbitmqVhost?: string;
     rabbitmqExchange?: string;
     connectionTimeout?: number;

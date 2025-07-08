@@ -42,7 +42,7 @@ export class ObservabilityLogger {
       environment: config.environment || 'development',
       rabbitmqHostname: config.rabbitmqHostname || 'localhost',
       rabbitmqPort: config.rabbitmqPort || 5672,
-      rabbitmqVhost: config.rabbitmqVhost || '/observability',
+      rabbitmqVhost: config.rabbitmqVhost || 'observability',
       rabbitmqExchange: config.rabbitmqExchange || 'logs.topic',
       connectionTimeout: config.connectionTimeout || 30000,
       heartbeat: config.heartbeat || 60,

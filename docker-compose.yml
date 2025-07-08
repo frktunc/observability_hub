@@ -276,7 +276,7 @@ services:
       - observability
     environment:
       - NODE_ENV=development
-      - PORT=3000
+      - PORT=3004
       - RABBITMQ_URL=amqp://rabbitmq:5672 # Fallback/legacy
       - RABBITMQ_HOSTNAME=rabbitmq
       - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
@@ -286,7 +286,7 @@ services:
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
     ports:
-      - "3000:3000"
+      - "3004:3004"
     deploy:
       resources:
         limits:

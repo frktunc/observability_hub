@@ -1,24 +1,53 @@
 {
-  "rabbit_version": "3.12.10",
-  "rabbitmq_version": "3.12.10",
+  "rabbit_version": "3.13.7",
+  "rabbitmq_version": "3.13.7",
   "product_name": "RabbitMQ",
-  "product_version": "3.12.10",
+  "product_version": "3.13.7",
   "users": [
     {
       "name": "obs_user",
       "password": "obs_password",
-      "tags": "administrator"
+      "tags": ["administrator"]
+    },
+    {
+      "name": "guest",
+      "password": "guest",
+      "tags": ["administrator"]
     }
   ],
   "vhosts": [
     {
       "name": "/observability"
+    },
+    {
+      "name": "/"
     }
   ],
   "permissions": [
     {
       "user": "obs_user",
       "vhost": "/observability",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "obs_user",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "guest",
+      "vhost": "/observability",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "guest",
+      "vhost": "/",
       "configure": ".*",
       "write": ".*",
       "read": ".*"
@@ -145,6 +174,15 @@
       "auto_delete": false,
       "internal": false,
       "arguments": {}
+    },
+    {
+      "name": "log_events_dlx",
+      "vhost": "/observability",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
     }
   ],
   "queues": [
@@ -258,6 +296,22 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {}
+    },
+    {
+      "name": "log_events",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "log_events_dlx"
+      }
+    },
+    {
+      "name": "log_events_dlq",
+      "vhost": "/observability",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
     }
   ],
   "bindings": [
@@ -266,12 +320,12 @@
       "vhost": "/observability",
       "destination": "logs.collector",
       "destination_type": "queue",
-      "routing_key": "logs.*",
+      "routing_key": "logs.#",
       "arguments": {}
     },
     {
       "source": "logs.topic",
-      "vhost": "/observability",
+      "vhost": "/observability", 
       "destination": "logs.info",
       "destination_type": "queue",
       "routing_key": "logs.info",
@@ -280,7 +334,7 @@
     {
       "source": "logs.topic",
       "vhost": "/observability",
-      "destination": "logs.warning",
+      "destination": "logs.warning", 
       "destination_type": "queue",
       "routing_key": "logs.warning",
       "arguments": {}
@@ -289,7 +343,7 @@
       "source": "logs.topic",
       "vhost": "/observability",
       "destination": "logs.error",
-      "destination_type": "queue",
+      "destination_type": "queue", 
       "routing_key": "logs.error",
       "arguments": {}
     },
@@ -298,15 +352,15 @@
       "vhost": "/observability",
       "destination": "metrics.collector",
       "destination_type": "queue",
-      "routing_key": "metrics.*",
+      "routing_key": "metrics.#",
       "arguments": {}
     },
     {
-      "source": "traces.topic",
+      "source": "traces.topic", 
       "vhost": "/observability",
       "destination": "traces.collector",
       "destination_type": "queue",
-      "routing_key": "traces.*",
+      "routing_key": "traces.#",
       "arguments": {}
     },
     {
@@ -314,7 +368,7 @@
       "vhost": "/observability",
       "destination": "alerts.processor",
       "destination_type": "queue",
-      "routing_key": "alerts.*",
+      "routing_key": "alerts.#",
       "arguments": {}
     },
     {
@@ -322,31 +376,15 @@
       "vhost": "/observability",
       "destination": "health.monitor",
       "destination_type": "queue",
-      "routing_key": "health.*",
+      "routing_key": "health.#",
       "arguments": {}
     },
     {
-      "source": "dlx.logs",
+      "source": "log_events_dlx",
       "vhost": "/observability",
-      "destination": "dlq.logs",
+      "destination": "log_events_dlq",
       "destination_type": "queue",
-      "routing_key": "failed",
-      "arguments": {}
-    },
-    {
-      "source": "dlx.metrics",
-      "vhost": "/observability",
-      "destination": "dlq.metrics",
-      "destination_type": "queue",
-      "routing_key": "failed",
-      "arguments": {}
-    },
-    {
-      "source": "dlx.traces",
-      "vhost": "/observability",
-      "destination": "dlq.traces",
-      "destination_type": "queue",
-      "routing_key": "failed",
+      "routing_key": "",
       "arguments": {}
     }
   ]

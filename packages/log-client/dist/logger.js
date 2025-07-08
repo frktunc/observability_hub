@@ -18,11 +18,13 @@ class ObservabilityLogger {
     batchTimer;
     constructor(config) {
         this.config = {
+            ...config,
             serviceName: config.serviceName,
             serviceVersion: config.serviceVersion || '1.0.0',
             environment: config.environment || 'development',
-            rabbitmqUrl: config.rabbitmqUrl,
-            rabbitmqVhost: config.rabbitmqVhost || '/observability',
+            rabbitmqHostname: config.rabbitmqHostname || 'localhost',
+            rabbitmqPort: config.rabbitmqPort || 5672,
+            rabbitmqVhost: config.rabbitmqVhost || 'observability',
             rabbitmqExchange: config.rabbitmqExchange || 'logs.topic',
             connectionTimeout: config.connectionTimeout || 30000,
             heartbeat: config.heartbeat || 60,
@@ -47,10 +49,18 @@ class ObservabilityLogger {
     }
     async connect() {
         try {
-            this.connection = await (0, amqplib_1.connect)(this.config.rabbitmqUrl, {
-                heartbeat: this.config.heartbeat,
-                timeout: this.config.connectionTimeout,
-            });
+            const { rabbitmqHostname, rabbitmqPort, rabbitmqUsername, rabbitmqPassword, rabbitmqVhost, heartbeat, connectionTimeout, } = this.config;
+            const connOptions = {
+                protocol: 'amqp',
+                hostname: rabbitmqHostname,
+                port: rabbitmqPort,
+                username: rabbitmqUsername,
+                password: rabbitmqPassword,
+                vhost: rabbitmqVhost,
+                heartbeat: heartbeat,
+                timeout: connectionTimeout,
+            };
+            this.connection = await (0, amqplib_1.connect)(connOptions);
             this.channel = await this.connection.createChannel();
             if (this.channel) {
                 await this.channel.assertExchange(this.config.rabbitmqExchange, 'topic', { durable: true });

@@ -38,7 +38,7 @@ up: ## Start all infrastructure services
 	@echo "| |    /\__/ /  | |  "
 	@echo "\_|    \____/   \_/  "
 	@echo ""
-	@docker-compose up -d postgres rabbitmq jaeger grafana redis
+	@docker-compose up -d 
 	@echo "⏳ Waiting for infrastructure to be ready..."
 	@sleep 20
 	@make health-infra
