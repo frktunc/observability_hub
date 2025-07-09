@@ -1,4 +1,5 @@
 import express from 'express';
+export declare function initializeServices(): Promise<void>;
 export declare function createApp(): express.Application;
 declare global {
     namespace Express {

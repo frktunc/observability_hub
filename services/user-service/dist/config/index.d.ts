@@ -4,13 +4,33 @@ export declare const config: {
     HOST: string;
     SERVICE_NAME: string;
     SERVICE_VERSION: string;
+    DATABASE_URL: string;
+    DATABASE_HOST: string;
+    DATABASE_PORT: number;
+    DATABASE_NAME: string;
+    DATABASE_USER: string;
+    DATABASE_PASSWORD: string;
+    DATABASE_POOL_MIN: number;
+    DATABASE_POOL_MAX: number;
+    DATABASE_TIMEOUT: number;
     RABBITMQ_URL: string;
+    RABBITMQ_HOSTNAME: string;
+    RABBITMQ_PORT: number;
+    RABBITMQ_USER: string;
+    RABBITMQ_PASSWORD: string;
     RABBITMQ_VHOST: string;
     RABBITMQ_EXCHANGE: string;
     RABBITMQ_CONNECTION_TIMEOUT: number;
     RABBITMQ_HEARTBEAT: number;
     RABBITMQ_MAX_RETRIES: number;
     RABBITMQ_RETRY_DELAY: number;
+    REDIS_HOST: string;
+    REDIS_PORT: number;
+    REDIS_DB: number;
+    REDIS_CONNECTION_TIMEOUT: number;
+    REDIS_COMMAND_TIMEOUT: number;
+    REDIS_MAX_RETRIES: number;
+    REDIS_RETRY_DELAY: number;
     LOG_LEVEL: "error" | "warn" | "info" | "debug" | "trace";
     LOG_FORMAT: "json" | "pretty";
     LOG_MAX_FILE_SIZE: string;
@@ -25,6 +45,8 @@ export declare const config: {
     RATE_LIMIT_ENABLED: boolean;
     RATE_LIMIT_WINDOW_MS: number;
     RATE_LIMIT_MAX_REQUESTS: number;
+    RATE_LIMIT_REDIS_ENABLED: boolean;
+    RATE_LIMIT_REDIS_PREFIX: string;
     CIRCUIT_BREAKER_ENABLED: boolean;
     CIRCUIT_BREAKER_TIMEOUT: number;
     CIRCUIT_BREAKER_ERROR_THRESHOLD: number;
@@ -39,14 +61,32 @@ export declare const config: {
     FEATURE_COMPRESSION: boolean;
     FEATURE_CORRELATION_ID_GENERATION: boolean;
     SERVICE_INSTANCE_ID?: string | undefined;
+    REDIS_PASSWORD?: string | undefined;
 };
 export declare const derivedConfig: {
     isDevelopment: boolean;
     isProduction: boolean;
     httpUrl: string;
     metricsUrl: string;
+    database: {
+        url: string;
+        host: string;
+        port: number;
+        name: string;
+        user: string;
+        password: string;
+        pool: {
+            min: number;
+            max: number;
+        };
+        timeout: number;
+    };
     rabbitmq: {
         url: string;
+        hostname: string;
+        port: number;
+        user: string;
+        password: string;
         vhost: string;
         exchange: string;
         routingKeys: {
@@ -65,7 +105,24 @@ export declare const derivedConfig: {
             retryDelayMs: number;
         };
     };
-   
+    redis: {
+        host: string;
+        port: number;
+        password: string | undefined;
+        db: number;
+        connectionTimeout: number;
+        commandTimeout: number;
+        retryOptions: {
+            maxRetries: number;
+            retryDelayMs: number;
+        };
+        rateLimiting: {
+            enabled: boolean;
+            prefix: string;
+            windowMs: number;
+            maxRequests: number;
+        };
+    };
 };
 export declare const validateConfiguration: () => void;
 export type Config = typeof config;

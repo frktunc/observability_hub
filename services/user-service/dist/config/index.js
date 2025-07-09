@@ -18,15 +18,37 @@ const configSchema = zod_1.z.object({
     SERVICE_NAME: zod_1.z.string().default('user-service'),
     SERVICE_VERSION: zod_1.z.string().default('1.0.0'),
     SERVICE_INSTANCE_ID: zod_1.z.string().optional(),
+    // Database Configuration
+    DATABASE_URL: zod_1.z.string().default('postgresql://user_service_user:user_service_password@user_service_db:5432/user_service_db'),
+    DATABASE_HOST: zod_1.z.string().default('user_service_db'),
+    DATABASE_PORT: zod_1.z.coerce.number().default(5432),
+    DATABASE_NAME: zod_1.z.string().default('user_service_db'),
+    DATABASE_USER: zod_1.z.string().default('user_service_user'),
+    DATABASE_PASSWORD: zod_1.z.string().default('user_service_password'),
+    DATABASE_POOL_MIN: zod_1.z.coerce.number().default(2),
+    DATABASE_POOL_MAX: zod_1.z.coerce.number().default(10),
+    DATABASE_TIMEOUT: zod_1.z.coerce.number().default(5000),
     // RabbitMQ Configuration
     RABBITMQ_URL: zod_1.z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672/'),
+    RABBITMQ_HOSTNAME: zod_1.z.string().default('rabbitmq'),
+    RABBITMQ_PORT: zod_1.z.coerce.number().default(5672),
+    RABBITMQ_USER: zod_1.z.string().default('obs_user'),
+    RABBITMQ_PASSWORD: zod_1.z.string().default('obs_password'),
     RABBITMQ_VHOST: zod_1.z.string().default('/'),
     RABBITMQ_EXCHANGE: zod_1.z.string().default('logs.topic'),
     RABBITMQ_CONNECTION_TIMEOUT: zod_1.z.coerce.number().default(30000),
     RABBITMQ_HEARTBEAT: zod_1.z.coerce.number().default(60),
     RABBITMQ_MAX_RETRIES: zod_1.z.coerce.number().default(5),
     RABBITMQ_RETRY_DELAY: zod_1.z.coerce.number().default(2000),
-    
+    // Redis Configuration
+    REDIS_HOST: zod_1.z.string().default('obs_redis'),
+    REDIS_PORT: zod_1.z.coerce.number().default(6379),
+    REDIS_PASSWORD: zod_1.z.string().optional(),
+    REDIS_DB: zod_1.z.coerce.number().default(0),
+    REDIS_CONNECTION_TIMEOUT: zod_1.z.coerce.number().default(5000),
+    REDIS_COMMAND_TIMEOUT: zod_1.z.coerce.number().default(5000),
+    REDIS_MAX_RETRIES: zod_1.z.coerce.number().default(3),
+    REDIS_RETRY_DELAY: zod_1.z.coerce.number().default(1000),
     // Logging Configuration
     LOG_LEVEL: zod_1.z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info'),
     LOG_FORMAT: zod_1.z.enum(['json', 'pretty']).default('json'),
@@ -44,7 +66,9 @@ const configSchema = zod_1.z.object({
     // Rate Limiting
     RATE_LIMIT_ENABLED: zod_1.z.coerce.boolean().default(true),
     RATE_LIMIT_WINDOW_MS: zod_1.z.coerce.number().default(60000), // 1 minute
-    RATE_LIMIT_MAX_REQUESTS: zod_1.z.coerce.number().default(1000),
+    RATE_LIMIT_MAX_REQUESTS: zod_1.z.coerce.number().default(100), // Redis ile daha güçlü rate limiting
+    RATE_LIMIT_REDIS_ENABLED: zod_1.z.coerce.boolean().default(true),
+    RATE_LIMIT_REDIS_PREFIX: zod_1.z.string().default('rl:user-service:'),
     // Circuit Breaker
     CIRCUIT_BREAKER_ENABLED: zod_1.z.coerce.boolean().default(true),
     CIRCUIT_BREAKER_TIMEOUT: zod_1.z.coerce.number().default(3000),
@@ -88,9 +112,27 @@ exports.derivedConfig = {
     // Service URLs
     httpUrl: `http://${exports.config.HOST}:${exports.config.PORT}`,
     metricsUrl: `http://${exports.config.HOST}:${exports.config.METRICS_PORT}${exports.config.METRICS_PATH}`,
+    // Database configuration
+    database: {
+        url: exports.config.DATABASE_URL,
+        host: exports.config.DATABASE_HOST,
+        port: exports.config.DATABASE_PORT,
+        name: exports.config.DATABASE_NAME,
+        user: exports.config.DATABASE_USER,
+        password: exports.config.DATABASE_PASSWORD,
+        pool: {
+            min: exports.config.DATABASE_POOL_MIN,
+            max: exports.config.DATABASE_POOL_MAX,
+        },
+        timeout: exports.config.DATABASE_TIMEOUT,
+    },
     // RabbitMQ routing
     rabbitmq: {
         url: exports.config.RABBITMQ_URL,
+        hostname: exports.config.RABBITMQ_HOSTNAME,
+        port: exports.config.RABBITMQ_PORT,
+        user: exports.config.RABBITMQ_USER,
+        password: exports.config.RABBITMQ_PASSWORD,
         vhost: exports.config.RABBITMQ_VHOST,
         exchange: exports.config.RABBITMQ_EXCHANGE,
         routingKeys: {
@@ -109,7 +151,25 @@ exports.derivedConfig = {
             retryDelayMs: exports.config.RABBITMQ_RETRY_DELAY,
         }
     },
-   
+    // Redis configuration
+    redis: {
+        host: exports.config.REDIS_HOST,
+        port: exports.config.REDIS_PORT,
+        password: exports.config.REDIS_PASSWORD,
+        db: exports.config.REDIS_DB,
+        connectionTimeout: exports.config.REDIS_CONNECTION_TIMEOUT,
+        commandTimeout: exports.config.REDIS_COMMAND_TIMEOUT,
+        retryOptions: {
+            maxRetries: exports.config.REDIS_MAX_RETRIES,
+            retryDelayMs: exports.config.REDIS_RETRY_DELAY,
+        },
+        rateLimiting: {
+            enabled: exports.config.RATE_LIMIT_REDIS_ENABLED,
+            prefix: exports.config.RATE_LIMIT_REDIS_PREFIX,
+            windowMs: exports.config.RATE_LIMIT_WINDOW_MS,
+            maxRequests: exports.config.RATE_LIMIT_MAX_REQUESTS,
+        }
+    },
 };
 // Configuration validation and startup info
 const validateConfiguration = () => {

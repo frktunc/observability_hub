@@ -2,31 +2,24 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userRoutes = void 0;
 const express_1 = require("express");
-const log_client_1 = require("@observability-hub/log-client");
 const uuid_1 = require("uuid");
-// Mock user data (gerçek projede database kullanılır)
-const users = [
-    {
-        id: '1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        role: 'user',
-        createdAt: new Date().toISOString(),
-    },
-    {
-        id: '2',
-        name: 'Jane Smith',
-        email: 'jane@example.com',
-        role: 'admin',
-        createdAt: new Date().toISOString(),
-    },
-];
+const log_client_1 = require("@observability-hub/log-client");
+const config_1 = require("../config");
+const user_repository_1 = require("../services/user-repository");
 const router = (0, express_1.Router)();
 exports.userRoutes = router;
 // Initialize logger
 const logger = new log_client_1.ObservabilityLogger({
-    serviceName: 'user-service',
-    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://obs_user:obs_password@obs_rabbitmq:5672/',
+    serviceName: config_1.config.SERVICE_NAME,
+    serviceVersion: config_1.config.SERVICE_VERSION,
+    environment: config_1.config.NODE_ENV,
+    rabbitmqHostname: config_1.derivedConfig.rabbitmq.hostname,
+    rabbitmqPort: config_1.derivedConfig.rabbitmq.port,
+    rabbitmqUsername: config_1.derivedConfig.rabbitmq.user,
+    rabbitmqPassword: config_1.derivedConfig.rabbitmq.password,
+    rabbitmqVhost: config_1.derivedConfig.rabbitmq.vhost,
+    rabbitmqExchange: config_1.derivedConfig.rabbitmq.exchange,
+    defaultLogLevel: config_1.config.LOG_LEVEL,
 });
 // GET /api/v1/users - List all users
 router.get('/', async (req, res) => {
@@ -36,6 +29,7 @@ router.get('/', async (req, res) => {
             requestId: req.correlationId || undefined,
             clientIP: req.ip || undefined,
         });
+        const users = await user_repository_1.userRepository.getAllUsers();
         res.json({
             success: true,
             data: users,
@@ -56,7 +50,7 @@ router.get('/', async (req, res) => {
 // POST /api/v1/users - Create new user
 router.post('/', async (req, res) => {
     try {
-        const { name, email, role = 'user' } = req.body;
+        const { name, email, role = 'user', country } = req.body;
         // Validation
         if (!name || !email) {
             await logger.warn('Invalid user creation request', {
@@ -70,12 +64,25 @@ router.post('/', async (req, res) => {
             });
             return;
         }
+        // Validate country code if provided (should be 3-letter ISO code)
+        if (country && (!country.match(/^[A-Z]{3}$/))) {
+            await logger.warn('Invalid country code provided', {
+                operation: 'create_user',
+                requestId: req.correlationId,
+                country,
+            });
+            res.status(400).json({
+                success: false,
+                error: 'Country must be a valid 3-letter ISO country code (e.g., TUR, USA, FRA)',
+            });
+            return;
+        }
         // Check if user already exists
-        const existingUser = users.find(u => u.email === email);
+        const existingUser = await user_repository_1.userRepository.getUserByEmail(email);
         if (existingUser) {
             await logger.warn('User creation failed - email already exists', {
                 operation: 'create_user',
-                requestId: req.correlationId,
+                requestId: req.correlationId || '',
                 email,
             });
             res.status(409).json({
@@ -85,14 +92,13 @@ router.post('/', async (req, res) => {
             return;
         }
         // Create new user
-        const newUser = {
-            id: (0, uuid_1.v4)(),
+        const userData = {
             name,
             email,
             role,
-            createdAt: new Date().toISOString(),
+            country,
         };
-        users.push(newUser);
+        const newUser = await user_repository_1.userRepository.createUser(userData);
         // Log business event
         await logger.businessEvent({
             eventType: 'user.created',
@@ -105,7 +111,7 @@ router.post('/', async (req, res) => {
         });
         await logger.info('User created successfully', {
             operation: 'create_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: newUser.id,
             userEmail: newUser.email,
         });
@@ -117,9 +123,17 @@ router.post('/', async (req, res) => {
     catch (error) {
         await logger.error('Failed to create user', error, {
             operation: 'create_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             requestBody: req.body,
         });
+        // Handle specific database errors
+        if (error.message.includes('already exists')) {
+            res.status(409).json({
+                success: false,
+                error: error.message,
+            });
+            return;
+        }
         res.status(500).json({
             success: false,
             error: 'Internal server error',
@@ -130,11 +144,11 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const user = users.find(u => u.id === id);
+        const user = await user_repository_1.userRepository.getUserById(id);
         if (!user) {
             await logger.warn('User not found', {
                 operation: 'get_user',
-                requestId: req.correlationId,
+                requestId: req.correlationId || '',
                 userId: id,
             });
             res.status(404).json({
@@ -145,7 +159,7 @@ router.get('/:id', async (req, res) => {
         }
         await logger.info('User retrieved successfully', {
             operation: 'get_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: id,
         });
         res.json({
@@ -156,7 +170,7 @@ router.get('/:id', async (req, res) => {
     catch (error) {
         await logger.error('Failed to get user', error, {
             operation: 'get_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: req.params.id,
         });
         res.status(500).json({
@@ -169,12 +183,27 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, role } = req.body;
-        const userIndex = users.findIndex(u => u.id === id);
-        if (userIndex === -1) {
-            await logger.warn('User not found for update', {
+        const { name, email, role, country } = req.body;
+        // Validate country code if provided
+        if (country && (!country.match(/^[A-Z]{3}$/))) {
+            await logger.warn('Invalid country code provided for update', {
                 operation: 'update_user',
                 requestId: req.correlationId,
+                userId: id,
+                country,
+            });
+            res.status(400).json({
+                success: false,
+                error: 'Country must be a valid 3-letter ISO country code (e.g., TUR, USA, FRA)',
+            });
+            return;
+        }
+        // Check if user exists
+        const existingUser = await user_repository_1.userRepository.getUserById(id);
+        if (!existingUser) {
+            await logger.warn('User update failed - user not found', {
+                operation: 'update_user',
+                requestId: req.correlationId || '',
                 userId: id,
             });
             res.status(404).json({
@@ -183,31 +212,37 @@ router.put('/:id', async (req, res) => {
             });
             return;
         }
-        const oldUser = { ...users[userIndex] };
-        const updatedUser = {
-            ...users[userIndex],
-            ...(name && { name }),
-            ...(email && { email }),
-            ...(role && { role }),
-            updatedAt: new Date().toISOString(),
-        };
-        users[userIndex] = updatedUser;
+        // Update user
+        const userData = {};
+        if (name !== undefined)
+            userData.name = name;
+        if (email !== undefined)
+            userData.email = email;
+        if (role !== undefined)
+            userData.role = role;
+        if (country !== undefined)
+            userData.country = country;
+        const updatedUser = await user_repository_1.userRepository.updateUser(id, userData);
+        if (!updatedUser) {
+            res.status(404).json({
+                success: false,
+                error: 'User not found',
+            });
+            return;
+        }
         // Log business event
         await logger.businessEvent({
             eventType: 'user.updated',
-            aggregateId: id || '',
+            aggregateId: updatedUser.id,
             aggregateType: 'User',
             eventVersion: 1,
             correlationId: req.correlationId || (0, uuid_1.v4)(),
             timestamp: new Date().toISOString(),
-            data: {
-                old: oldUser,
-                new: updatedUser,
-            },
+            data: updatedUser,
         });
         await logger.info('User updated successfully', {
             operation: 'update_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: id,
         });
         res.json({
@@ -218,10 +253,18 @@ router.put('/:id', async (req, res) => {
     catch (error) {
         await logger.error('Failed to update user', error, {
             operation: 'update_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: req.params.id,
             requestBody: req.body,
         });
+        // Handle specific database errors
+        if (error.message.includes('already exists')) {
+            res.status(409).json({
+                success: false,
+                error: error.message,
+            });
+            return;
+        }
         res.status(500).json({
             success: false,
             error: 'Internal server error',
@@ -232,11 +275,12 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const userIndex = users.findIndex(u => u.id === id);
-        if (userIndex === -1) {
-            await logger.warn('User not found for deletion', {
+        // Check if user exists
+        const existingUser = await user_repository_1.userRepository.getUserById(id);
+        if (!existingUser) {
+            await logger.warn('User deletion failed - user not found', {
                 operation: 'delete_user',
-                requestId: req.correlationId,
+                requestId: req.correlationId || '',
                 userId: id,
             });
             res.status(404).json({
@@ -245,30 +289,123 @@ router.delete('/:id', async (req, res) => {
             });
             return;
         }
-        const deletedUser = users[userIndex];
-        users.splice(userIndex, 1);
+        // Delete user
+        const deleted = await user_repository_1.userRepository.deleteUser(id);
+        if (!deleted) {
+            res.status(404).json({
+                success: false,
+                error: 'User not found',
+            });
+            return;
+        }
         // Log business event
         await logger.businessEvent({
             eventType: 'user.deleted',
-            aggregateId: id || '',
+            aggregateId: id,
             aggregateType: 'User',
             eventVersion: 1,
             correlationId: req.correlationId || (0, uuid_1.v4)(),
             timestamp: new Date().toISOString(),
-            data: deletedUser,
+            data: { id: id, deletedUser: existingUser },
         });
         await logger.info('User deleted successfully', {
             operation: 'delete_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: id,
         });
-        res.status(204).send();
+        res.json({
+            success: true,
+            message: 'User deleted successfully',
+        });
     }
     catch (error) {
         await logger.error('Failed to delete user', error, {
             operation: 'delete_user',
-            requestId: req.correlationId,
+            requestId: req.correlationId || '',
             userId: req.params.id,
+        });
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+        });
+    }
+});
+// GET /api/v1/users/role/:role - Get users by role
+router.get('/role/:role', async (req, res) => {
+    try {
+        const { role } = req.params;
+        await logger.info('Users by role requested', {
+            operation: 'list_users_by_role',
+            requestId: req.correlationId || '',
+            role,
+        });
+        const users = await user_repository_1.userRepository.getUsersByRole(role);
+        res.json({
+            success: true,
+            data: users,
+            count: users.length,
+            role,
+        });
+    }
+    catch (error) {
+        await logger.error('Failed to list users by role', error, {
+            operation: 'list_users_by_role',
+            requestId: req.correlationId || '',
+            role: req.params.role,
+        });
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+        });
+    }
+});
+// GET /api/v1/users/country/:country - Get users by country
+router.get('/country/:country', async (req, res) => {
+    try {
+        const { country } = req.params;
+        await logger.info('Users by country requested', {
+            operation: 'list_users_by_country',
+            requestId: req.correlationId || '',
+            country,
+        });
+        const users = await user_repository_1.userRepository.getUsersByCountry(country);
+        res.json({
+            success: true,
+            data: users,
+            count: users.length,
+            country,
+        });
+    }
+    catch (error) {
+        await logger.error('Failed to list users by country', error, {
+            operation: 'list_users_by_country',
+            requestId: req.correlationId || '',
+            country: req.params.country,
+        });
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error',
+        });
+    }
+});
+// GET /api/v1/users/stats/countries - Get country statistics for Grafana
+router.get('/stats/countries', async (req, res) => {
+    try {
+        await logger.info('Country statistics requested', {
+            operation: 'country_stats',
+            requestId: req.correlationId || '',
+        });
+        const stats = await user_repository_1.userRepository.getCountryStats();
+        res.json({
+            success: true,
+            data: stats,
+            count: stats.length,
+        });
+    }
+    catch (error) {
+        await logger.error('Failed to get country statistics', error, {
+            operation: 'country_stats',
+            requestId: req.correlationId || '',
         });
         res.status(500).json({
             success: false,

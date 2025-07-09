@@ -2,8 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
-import slowDown from 'express-slow-down';
 
 import { ObservabilityLogger } from '@observability-hub/log-client';
 import { config, derivedConfig } from './config';
@@ -11,6 +9,8 @@ import { metricsMiddleware, metricsRegistry } from './middleware/metrics';
 import { requestLoggingMiddleware } from './middleware/request-logging';
 import { errorHandler } from './middleware/error-handler';
 import { correlationIdMiddleware } from './middleware/correlation-id';
+import { createRateLimitMiddleware } from './middleware/rate-limiting';
+import { initializeRedis } from './services/redis-client';
 import { healthRoutes } from './routes/health';
 import { userRoutes } from './routes/users';
 import { metricsRoutes } from './routes/metrics';
@@ -25,6 +25,21 @@ const logger = new ObservabilityLogger({
   rabbitmqExchange: derivedConfig.rabbitmq.exchange,
   defaultLogLevel: config.LOG_LEVEL as any,
 });
+
+// Initialize Redis client
+export async function initializeServices(): Promise<void> {
+  try {
+    if (derivedConfig.redis.rateLimiting.enabled) {
+      await initializeRedis();
+      console.log('🎯 Redis services initialized successfully');
+    } else {
+      console.log('⚠️ Redis rate limiting disabled, using memory fallback');
+    }
+  } catch (error) {
+    console.error('❌ Failed to initialize Redis, falling back to memory rate limiting:', error);
+    // Don't throw error - let the app continue with memory fallback
+  }
+}
 
 export function createApp(): express.Application {
   const app = express();
@@ -76,37 +91,10 @@ export function createApp(): express.Application {
     limit: '10mb' 
   }));
 
-  // Rate limiting
+  // Redis-based rate limiting
   if (config.RATE_LIMIT_ENABLED) {
-        const limiter = rateLimit({
-      windowMs: config.RATE_LIMIT_WINDOW_MS,
-      max: config.RATE_LIMIT_MAX_REQUESTS,
-      message: {
-        error: 'Too many requests',
-        code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: Math.ceil(config.RATE_LIMIT_WINDOW_MS / 1000),
-      },
-      standardHeaders: true,
-      legacyHeaders: false,
-      keyGenerator: (req) => {
-        // Use tenant ID for multi-tenant rate limiting
-        const tenantId = req.headers[config.TENANT_HEADER_NAME] || config.DEFAULT_TENANT_ID;
-        const clientId = req.ip || 'unknown';
-        return `${tenantId}:${clientId}`;
-      },
-    });
-
-    app.use(limiter);
-
-    // Speed limiter for additional protection
-    const speedLimiter = slowDown({
-      windowMs: config.RATE_LIMIT_WINDOW_MS,
-      delayAfter: Math.floor(config.RATE_LIMIT_MAX_REQUESTS * 0.5),
-      delayMs: () => 500,
-      maxDelayMs: 20000,
-    });
-
-    app.use(speedLimiter);
+    const rateLimitMiddleware = createRateLimitMiddleware();
+    app.use(rateLimitMiddleware);
   }
 
   // Custom middleware

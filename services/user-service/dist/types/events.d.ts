@@ -84,20 +84,6 @@ export interface ProducerMetrics {
     connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
     lastMessageTimestamp?: string;
 }
-export interface LogServiceRequest {
-    message: LogMessage;
-    options?: {
-        timeout?: number;
-        retries?: number;
-    };
-}
-export interface LogServiceBatchRequest {
-    batch: BatchLogRequest;
-    options?: {
-        timeout?: number;
-        retries?: number;
-    };
-}
 export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 export interface CircuitBreakerMetrics {
     state: CircuitBreakerState;
@@ -115,7 +101,6 @@ export interface HealthStatus {
             latency?: number;
             error?: string;
         };
-       
         memory: {
             used: number;
             limit: number;

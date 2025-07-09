@@ -1,7 +1,8 @@
-import { createApp } from './app';
+import { createApp, initializeServices } from './app';
 import { config, derivedConfig } from './config';
 import { ObservabilityLogger } from '@observability-hub/log-client';
 import { db } from './services/database';
+import { closeRedis } from './services/redis-client';
 
 // Initialize observability logger
 const logger = new ObservabilityLogger({
@@ -20,6 +21,10 @@ async function startServer() {
     console.log('🔗 Initializing database connection...');
     await db.connect();
     console.log('✅ Database connected and schema initialized');
+
+    // Initialize Redis and other services
+    console.log('🔗 Initializing Redis services...');
+    await initializeServices();
 
     const app = createApp();
     
@@ -54,6 +59,14 @@ async function startServer() {
           console.log('💾 Database disconnected');
         } catch (error) {
           console.error('Error disconnecting database:', error);
+        }
+
+        // Disconnect Redis
+        try {
+          await closeRedis();
+          console.log('🔌 Redis disconnected');
+        } catch (error) {
+          console.error('Error disconnecting Redis:', error);
         }
 
         logger.info('Server closed', {

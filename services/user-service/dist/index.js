@@ -3,17 +3,27 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const app_1 = require("./app");
 const config_1 = require("./config");
 const log_client_1 = require("@observability-hub/log-client");
+const database_1 = require("./services/database");
+const redis_client_1 = require("./services/redis-client");
 // Initialize observability logger
 const logger = new log_client_1.ObservabilityLogger({
-    serviceName: 'user-service',
+    serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
     environment: config_1.config.NODE_ENV,
-    rabbitmqUrl: config_1.config.RABBITMQ_URL,
-    rabbitmqVhost: config_1.config.RABBITMQ_VHOST,
-    rabbitmqExchange: config_1.config.RABBITMQ_EXCHANGE,
+    rabbitmqUrl: config_1.derivedConfig.rabbitmq.url,
+    rabbitmqVhost: config_1.derivedConfig.rabbitmq.vhost,
+    rabbitmqExchange: config_1.derivedConfig.rabbitmq.exchange,
+    defaultLogLevel: config_1.config.LOG_LEVEL,
 });
 async function startServer() {
     try {
+        // Initialize database connection first
+        console.log('🔗 Initializing database connection...');
+        await database_1.db.connect();
+        console.log('✅ Database connected and schema initialized');
+        // Initialize Redis and other services
+        console.log('🔗 Initializing Redis services...');
+        await (0, app_1.initializeServices)();
         const app = (0, app_1.createApp)();
         // Start the server
         const server = app.listen(config_1.config.PORT, () => {
@@ -22,11 +32,13 @@ async function startServer() {
                 port: config_1.config.PORT,
                 environment: config_1.config.NODE_ENV,
                 serviceVersion: config_1.config.SERVICE_VERSION,
+                databaseStatus: database_1.db.getConnectionStatus(),
             });
             console.log(`🚀 User Service is running on port ${config_1.config.PORT}`);
             console.log(`📊 Health check: http://localhost:${config_1.config.PORT}/health`);
             console.log(`📈 Metrics: http://localhost:${config_1.config.PORT}/metrics`);
             console.log(`👥 Users API: http://localhost:${config_1.config.PORT}/api/v1/users`);
+            console.log(`💾 Database: Connected and ready`);
         });
         // Graceful shutdown
         const gracefulShutdown = (signal) => {
@@ -34,7 +46,23 @@ async function startServer() {
                 component: 'server',
                 signal,
             });
-            server.close(() => {
+            server.close(async () => {
+                // Disconnect database
+                try {
+                    await database_1.db.disconnect();
+                    console.log('💾 Database disconnected');
+                }
+                catch (error) {
+                    console.error('Error disconnecting database:', error);
+                }
+                // Disconnect Redis
+                try {
+                    await (0, redis_client_1.closeRedis)();
+                    console.log('🔌 Redis disconnected');
+                }
+                catch (error) {
+                    console.error('Error disconnecting Redis:', error);
+                }
                 logger.info('Server closed', {
                     component: 'server',
                 });
@@ -64,6 +92,7 @@ async function startServer() {
         logger.error('Failed to start server', error, {
             component: 'server',
         });
+        console.error('❌ Failed to start server:', error);
         process.exit(1);
     }
 }

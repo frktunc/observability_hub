@@ -3,31 +3,49 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.initializeServices = initializeServices;
 exports.createApp = createApp;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const compression_1 = __importDefault(require("compression"));
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
-const express_slow_down_1 = __importDefault(require("express-slow-down"));
 const log_client_1 = require("@observability-hub/log-client");
 const config_1 = require("./config");
 const metrics_1 = require("./middleware/metrics");
 const request_logging_1 = require("./middleware/request-logging");
 const error_handler_1 = require("./middleware/error-handler");
 const correlation_id_1 = require("./middleware/correlation-id");
+const rate_limiting_1 = require("./middleware/rate-limiting");
+const redis_client_1 = require("./services/redis-client");
 const health_1 = require("./routes/health");
 const users_1 = require("./routes/users");
 const metrics_2 = require("./routes/metrics");
 // Initialize observability logger
 const logger = new log_client_1.ObservabilityLogger({
-    serviceName: 'user-service',
+    serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
     environment: config_1.config.NODE_ENV,
-    rabbitmqUrl: config_1.config.RABBITMQ_URL,
-    rabbitmqVhost: config_1.config.RABBITMQ_VHOST,
-    rabbitmqExchange: config_1.config.RABBITMQ_EXCHANGE,
+    rabbitmqUrl: config_1.derivedConfig.rabbitmq.url,
+    rabbitmqVhost: config_1.derivedConfig.rabbitmq.vhost,
+    rabbitmqExchange: config_1.derivedConfig.rabbitmq.exchange,
+    defaultLogLevel: config_1.config.LOG_LEVEL,
 });
+// Initialize Redis client
+async function initializeServices() {
+    try {
+        if (config_1.derivedConfig.redis.rateLimiting.enabled) {
+            await (0, redis_client_1.initializeRedis)();
+            console.log('🎯 Redis services initialized successfully');
+        }
+        else {
+            console.log('⚠️ Redis rate limiting disabled, using memory fallback');
+        }
+    }
+    catch (error) {
+        console.error('❌ Failed to initialize Redis, falling back to memory rate limiting:', error);
+        // Don't throw error - let the app continue with memory fallback
+    }
+}
 function createApp() {
     const app = (0, express_1.default)();
     // Trust proxy for accurate client IPs
@@ -71,34 +89,10 @@ function createApp() {
         extended: true,
         limit: '10mb'
     }));
-    // Rate limiting
+    // Redis-based rate limiting
     if (config_1.config.RATE_LIMIT_ENABLED) {
-        const limiter = (0, express_rate_limit_1.default)({
-            windowMs: config_1.config.RATE_LIMIT_WINDOW_MS,
-            max: config_1.config.RATE_LIMIT_MAX_REQUESTS,
-            message: {
-                error: 'Too many requests',
-                code: 'RATE_LIMIT_EXCEEDED',
-                retryAfter: Math.ceil(config_1.config.RATE_LIMIT_WINDOW_MS / 1000),
-            },
-            standardHeaders: true,
-            legacyHeaders: false,
-            keyGenerator: (req) => {
-                // Use tenant ID for multi-tenant rate limiting
-                const tenantId = req.headers[config_1.config.TENANT_HEADER_NAME] || config_1.config.DEFAULT_TENANT_ID;
-                const clientId = req.ip || 'unknown';
-                return `${tenantId}:${clientId}`;
-            },
-        });
-        app.use(limiter);
-        // Speed limiter for additional protection
-        const speedLimiter = (0, express_slow_down_1.default)({
-            windowMs: config_1.config.RATE_LIMIT_WINDOW_MS,
-            delayAfter: Math.floor(config_1.config.RATE_LIMIT_MAX_REQUESTS * 0.5),
-            delayMs: () => 500,
-            maxDelayMs: 20000,
-        });
-        app.use(speedLimiter);
+        const rateLimitMiddleware = (0, rate_limiting_1.createRateLimitMiddleware)();
+        app.use(rateLimitMiddleware);
     }
     // Custom middleware
     app.use(correlation_id_1.correlationIdMiddleware);
