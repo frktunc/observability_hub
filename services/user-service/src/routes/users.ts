@@ -52,7 +52,7 @@ router.get('/', async (req: Request, res: Response) => {
 // POST /api/v1/users - Create new user
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, role = 'user' } = req.body;
+    const { name, email, role = 'user', country } = req.body;
 
     // Validation
     if (!name || !email) {
@@ -65,6 +65,21 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({
         success: false,
         error: 'Name and email are required',
+      });
+      return;
+    }
+
+    // Validate country code if provided (should be 3-letter ISO code)
+    if (country && (!country.match(/^[A-Z]{3}$/))) {
+      await logger.warn('Invalid country code provided', {
+        operation: 'create_user',
+        requestId: req.correlationId,
+        country,
+      });
+
+      res.status(400).json({
+        success: false,
+        error: 'Country must be a valid 3-letter ISO country code (e.g., TUR, USA, FRA)',
       });
       return;
     }
@@ -90,6 +105,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       name,
       email,
       role,
+      country,
     };
 
     const newUser = await userRepository.createUser(userData);
@@ -187,7 +203,23 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, role } = req.body;
+    const { name, email, role, country } = req.body;
+
+    // Validate country code if provided
+    if (country && (!country.match(/^[A-Z]{3}$/))) {
+      await logger.warn('Invalid country code provided for update', {
+        operation: 'update_user',
+        requestId: req.correlationId,
+        userId: id,
+        country,
+      });
+
+      res.status(400).json({
+        success: false,
+        error: 'Country must be a valid 3-letter ISO country code (e.g., TUR, USA, FRA)',
+      });
+      return;
+    }
 
     // Check if user exists
     const existingUser = await userRepository.getUserById(id as string);
@@ -210,6 +242,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (name !== undefined) userData.name = name;
     if (email !== undefined) userData.email = email;
     if (role !== undefined) userData.role = role;
+    if (country !== undefined) userData.country = country;
 
     const updatedUser = await userRepository.updateUser(id as string, userData);
 
@@ -357,6 +390,67 @@ router.get('/role/:role', async (req: Request, res: Response): Promise<void> => 
       operation: 'list_users_by_role',
       requestId: req.correlationId || '',
       role: req.params.role,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+// GET /api/v1/users/country/:country - Get users by country
+router.get('/country/:country', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { country } = req.params;
+    
+    await logger.info('Users by country requested', {
+      operation: 'list_users_by_country',
+      requestId: req.correlationId || '',
+      country,
+    });
+
+    const users = await userRepository.getUsersByCountry(country as string);
+
+    res.json({
+      success: true,
+      data: users,
+      count: users.length,
+      country,
+    });
+  } catch (error) {
+    await logger.error('Failed to list users by country', error as Error, {
+      operation: 'list_users_by_country',
+      requestId: req.correlationId || '',
+      country: req.params.country,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
+  }
+});
+
+// GET /api/v1/users/stats/countries - Get country statistics for Grafana
+router.get('/stats/countries', async (req: Request, res: Response): Promise<void> => {
+  try {
+    await logger.info('Country statistics requested', {
+      operation: 'country_stats',
+      requestId: req.correlationId || '',
+    });
+
+    const stats = await userRepository.getCountryStats();
+
+    res.json({
+      success: true,
+      data: stats,
+      count: stats.length,
+    });
+  } catch (error) {
+    await logger.error('Failed to get country statistics', error as Error, {
+      operation: 'country_stats',
+      requestId: req.correlationId || '',
     });
 
     res.status(500).json({

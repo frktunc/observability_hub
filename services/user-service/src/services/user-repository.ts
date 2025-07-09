@@ -6,6 +6,7 @@ export interface User extends Record<string, unknown> {
   name: string;
   email: string;
   role: string;
+  country?: string; // ISO 3166-1 alpha-3 country code (TUR, USA, etc.)
   createdAt: string;
   updatedAt?: string;
 }
@@ -14,19 +15,21 @@ export interface CreateUserRequest {
   name: string;
   email: string;
   role?: string;
+  country?: string; // ISO 3166-1 alpha-3 country code
 }
 
 export interface UpdateUserRequest {
   name?: string;
   email?: string;
   role?: string;
+  country?: string; // ISO 3166-1 alpha-3 country code
 }
 
 export class UserRepository {
   async getAllUsers(): Promise<User[]> {
     try {
       const result = await db.query(
-        'SELECT id, name, email, role, created_at as "createdAt", updated_at as "updatedAt" FROM users ORDER BY created_at DESC'
+        'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users ORDER BY created_at DESC'
       );
       return result.rows;
     } catch (error) {
@@ -38,7 +41,7 @@ export class UserRepository {
   async getUserById(id: string): Promise<User | null> {
     try {
       const result = await db.query(
-        'SELECT id, name, email, role, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE id = $1',
+        'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE id = $1',
         [id]
       );
       return result.rows[0] || null;
@@ -51,7 +54,7 @@ export class UserRepository {
   async getUserByEmail(email: string): Promise<User | null> {
     try {
       const result = await db.query(
-        'SELECT id, name, email, role, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE email = $1',
+        'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE email = $1',
         [email]
       );
       return result.rows[0] || null;
@@ -65,10 +68,11 @@ export class UserRepository {
     try {
       const id = uuidv4();
       const role = userData.role || 'user';
+      const country = userData.country || null;
       
       const result = await db.query(
-        'INSERT INTO users (id, name, email, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, created_at as "createdAt", updated_at as "updatedAt"',
-        [id, userData.name, userData.email, role]
+        'INSERT INTO users (id, name, email, role, country) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt"',
+        [id, userData.name, userData.email, role, country]
       );
       
       return result.rows[0];
@@ -106,6 +110,11 @@ export class UserRepository {
         values.push(userData.role);
       }
 
+      if (userData.country !== undefined) {
+        updateFields.push(`country = $${paramIndex++}`);
+        values.push(userData.country);
+      }
+
       if (updateFields.length === 0) {
         throw new Error('No fields to update');
       }
@@ -117,7 +126,7 @@ export class UserRepository {
         UPDATE users 
         SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP 
         WHERE id = $${paramIndex} 
-        RETURNING id, name, email, role, created_at as "createdAt", updated_at as "updatedAt"
+        RETURNING id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt"
       `;
 
       const result = await db.query(query, values);
@@ -157,13 +166,38 @@ export class UserRepository {
   async getUsersByRole(role: string): Promise<User[]> {
     try {
       const result = await db.query(
-        'SELECT id, name, email, role, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE role = $1 ORDER BY created_at DESC',
+        'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE role = $1 ORDER BY created_at DESC',
         [role]
       );
       return result.rows;
     } catch (error) {
       console.error('Error fetching users by role:', error);
       throw new Error('Failed to fetch users by role');
+    }
+  }
+
+  async getUsersByCountry(country: string): Promise<User[]> {
+    try {
+      const result = await db.query(
+        'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE country = $1 ORDER BY created_at DESC',
+        [country]
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error fetching users by country:', error);
+      throw new Error('Failed to fetch users by country');
+    }
+  }
+
+  async getCountryStats(): Promise<Array<{country: string, userCount: number}>> {
+    try {
+      const result = await db.query(
+        'SELECT country, COUNT(*) as "userCount" FROM users WHERE country IS NOT NULL GROUP BY country ORDER BY COUNT(*) DESC'
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('Error fetching country stats:', error);
+      throw new Error('Failed to fetch country stats');
     }
   }
 }

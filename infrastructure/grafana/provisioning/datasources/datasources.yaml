@@ -85,4 +85,19 @@ datasources:
       cachingConfig:
         enabled: true
         ttl: 300
-      timeout: 30 
+      timeout: 30
+
+  - name: User Service DB
+    type: postgres
+    access: proxy
+    url: user_service_db:5432
+    database: user_service_db
+    user: user_service_user
+    secureJsonData:
+      password: user_service_password
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: false
+    editable: true 

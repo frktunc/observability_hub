@@ -1,6 +1,6 @@
 /**
  * High-performance JSON Schema validator for observability events
- * Uses simplified validation for browser/TypeScript compatibility
+ * Uses AJV (Another JSON Schema Validator) for full JSON Schema support
  */
 import { ValidationResult } from '../types/base';
 /**
@@ -41,15 +41,29 @@ export interface ValidationMetrics {
  * High-performance event validator with caching and metrics
  */
 export declare class EventValidator {
+    private ajv;
     private validators;
+    private schemas;
     private metrics;
     private cacheHits;
     private cacheMisses;
-    constructor(_options?: ValidatorOptions);
+    constructor(options?: ValidatorOptions);
     /**
-     * Initialize mock validators for each schema type
+     * Load and compile JSON Schema validators
      */
     private initializeValidators;
+    /**
+     * Get fallback schema for when files are not found
+     */
+    private getFallbackSchema;
+    /**
+     * Get fallback validator for when schema compilation fails
+     */
+    private getFallbackValidator;
+    /**
+     * Initialize fallback validators when schema loading fails
+     */
+    private initializeFallbackValidators;
     /**
      * Validate data against a specific schema
      */
@@ -97,6 +111,14 @@ export declare class EventValidator {
      * Check if validator can handle the given throughput
      */
     canHandleThroughput(targetThroughput: number): boolean;
+    /**
+     * Get compiled schema for a given type
+     */
+    getSchema(schemaType: SchemaType): object | undefined;
+    /**
+     * Add a custom schema
+     */
+    addCustomSchema(schemaType: string, schema: object): boolean;
 }
 /**
  * Get the global validator instance
@@ -113,4 +135,8 @@ export declare function validateEvents(events: Array<{
     data: unknown;
     schemaType?: SchemaType;
 }>): ValidationResult[];
+/**
+ * Reset the global validator (useful for testing)
+ */
+export declare function resetGlobalValidator(): void;
 //# sourceMappingURL=schema-validator.d.ts.map
