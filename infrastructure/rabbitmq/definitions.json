@@ -183,6 +183,24 @@
       "auto_delete": false,
       "internal": false,
       "arguments": {}
+    },
+    {
+      "name": "logs.topic",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "log_events_dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
     }
   ],
   "queues": [
@@ -312,6 +330,22 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {}
+    },
+    {
+      "name": "log_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "log_events_dlx"
+      }
+    },
+        {
+      "name": "log_events_dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
     }
   ],
   "bindings": [
@@ -382,6 +416,22 @@
     {
       "source": "log_events_dlx",
       "vhost": "observability",
+      "destination": "log_events_dlq",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    },
+    {
+      "source": "logs.topic",
+      "vhost": "/",
+      "destination": "log_events",
+      "destination_type": "queue",
+      "routing_key": "logs.info",
+      "arguments": {}
+    },
+    {
+      "source": "log_events_dlx",
+      "vhost": "/",
       "destination": "log_events_dlq",
       "destination_type": "queue",
       "routing_key": "",

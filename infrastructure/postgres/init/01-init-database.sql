@@ -28,12 +28,18 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO obs_user;
 -- ==============================================
 CREATE TABLE IF NOT EXISTS logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id VARCHAR(255),
     correlation_id VARCHAR(255) NOT NULL,
-    service_name VARCHAR(100) NOT NULL,
-    log_level VARCHAR(20) NOT NULL,
+    service VARCHAR(100),
+    service_name VARCHAR(100),
+    level VARCHAR(20),
+    log_level VARCHAR(20),
     message TEXT NOT NULL,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    metadata JSONB DEFAULT '{}',
+    context TEXT DEFAULT '{}',
+    error TEXT DEFAULT '{}',
+    structured TEXT DEFAULT '{}',
+    metadata TEXT DEFAULT '{}',
     trace_id VARCHAR(255),
     span_id VARCHAR(255),
     parent_span_id VARCHAR(255),
@@ -128,8 +134,10 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
 -- Logs indexes
 CREATE INDEX IF NOT EXISTS idx_logs_correlation_id ON logs(correlation_id);
 CREATE INDEX IF NOT EXISTS idx_logs_service_name ON logs(service_name);
+CREATE INDEX IF NOT EXISTS idx_logs_service ON logs(service);
 CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_logs_log_level ON logs(log_level);
+CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
 CREATE INDEX IF NOT EXISTS idx_logs_trace_id ON logs(trace_id);
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
 
