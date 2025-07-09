@@ -1,303 +1,262 @@
 import { Router, Request, Response } from 'express';
 import { ObservabilityLogger } from '@observability-hub/log-client';
-import { 
-  Product, 
-  CreateProductRequest, 
-  UpdateProductRequest, 
-  ProductFilters,
-  ProductCreatedEvent,
-  ProductUpdatedEvent,
-  StockUpdatedEvent,
-  ProductDeactivatedEvent
-} from '../types/product';
-import { v4 as uuidv4 } from 'uuid';
+import { db, Product, CreateProductRequest, UpdateProductRequest, ProductFilters } from '../services/database';
+import { config } from '../config';
 
 const router = Router();
 
 // Initialize logger
 const logger = new ObservabilityLogger({
-  serviceName: 'product-service',
-  serviceVersion: '1.0.0',
-  environment: 'development',
+  serviceName: config.SERVICE_NAME,
+  serviceVersion: config.SERVICE_VERSION,
+  environment: config.NODE_ENV,
   rabbitmqUrl: 'amqp://obs_user:obs_password@obs_rabbitmq:5672/',
   rabbitmqVhost: '/',
-  rabbitmqExchange: 'logs',
-  defaultLogLevel: 'INFO' as any,
+  rabbitmqExchange: 'logs.topic',
+  defaultLogLevel: config.LOG_LEVEL as any,
 });
 
-// In-memory storage for demo
-const products: Map<string, Product> = new Map();
-
 // GET /api/v1/products - List all products
-router.get('/', (req: Request, res: Response): void => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   const correlationId = (req as any).correlationId || 'unknown';
-  const filters: ProductFilters = req.query as any;
   
-  logger.info('Fetching products', { filters, correlationId });
-  
-  let filteredProducts = Array.from(products.values());
-  
-  // Apply filters
-  if (filters.category) {
-    filteredProducts = filteredProducts.filter(p => p.category === filters.category);
+  try {
+    // Parse query parameters
+    const filters: ProductFilters = {
+      category: req.query.category as string,
+      min_price: req.query.min_price ? parseFloat(req.query.min_price as string) : undefined,
+      max_price: req.query.max_price ? parseFloat(req.query.max_price as string) : undefined,
+      is_active: req.query.is_active ? req.query.is_active === 'true' : true,
+      search: req.query.search as string
+    };
+    
+    const pagination = {
+      limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+      offset: req.query.offset ? parseInt(req.query.offset as string) : 0
+    };
+    
+    logger.info('Fetching products', { filters, pagination, correlationId });
+    
+    const result = await db.getAllProducts(filters, pagination);
+    
+    res.json({
+      products: result.products,
+      total: result.total,
+      limit: pagination.limit,
+      offset: pagination.offset,
+      correlationId
+    });
+  } catch (error) {
+    logger.error('Error fetching products:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch products',
+      correlationId
+    });
   }
-  
-  if (filters.isActive !== undefined) {
-    filteredProducts = filteredProducts.filter(p => p.isActive === filters.isActive);
-  }
-  
-  if (filters.minPrice) {
-    filteredProducts = filteredProducts.filter(p => p.price >= filters.minPrice!);
-  }
-  
-  if (filters.maxPrice) {
-    filteredProducts = filteredProducts.filter(p => p.price <= filters.maxPrice!);
-  }
-  
-  if (filters.inStock) {
-    filteredProducts = filteredProducts.filter(p => p.stockQuantity > 0);
-  }
-  
-  if (filters.search) {
-    const searchTerm = filters.search.toLowerCase();
-    filteredProducts = filteredProducts.filter(p => 
-      p.name.toLowerCase().includes(searchTerm) ||
-      p.description.toLowerCase().includes(searchTerm) ||
-      p.sku.toLowerCase().includes(searchTerm)
-    );
-  }
-  
-  // Pagination
-  const limit = filters.limit ? parseInt(filters.limit.toString()) : 50;
-  const offset = filters.offset ? parseInt(filters.offset.toString()) : 0;
-  const paginatedProducts = filteredProducts.slice(offset, offset + limit);
-  
-  res.json({
-    products: paginatedProducts,
-    total: filteredProducts.length,
-    limit,
-    offset,
-    correlationId
-  });
 });
 
 // GET /api/v1/products/:id - Get product by ID
-router.get('/:id', (req: Request, res: Response): void => {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const correlationId = (req as any).correlationId || 'unknown';
   const productId = req.params.id;
   
-  logger.info('Fetching product by ID', { productId, correlationId });
-  
-  const product = products.get(productId);
-  
-  if (!product) {
-    res.status(404).json({
-      error: 'Product not found',
-      productId,
-      correlationId
-    });
-    return;
-  }
-  
-  res.json({ product, correlationId });
-});
-
-// POST /api/v1/products - Create new product
-router.post('/', (req: Request, res: Response): void => {
-  const correlationId = (req as any).correlationId || 'unknown';
-  const productData: CreateProductRequest = req.body;
-  
-  logger.info('Creating new product', { productData, correlationId });
-  
-  const productId = uuidv4();
-  const now = new Date();
-  
-  const product: Product = {
-    id: productId,
-    name: productData.name,
-    description: productData.description,
-    sku: productData.sku,
-    category: productData.category,
-    price: productData.price,
-    currency: productData.currency,
-    stockQuantity: productData.stockQuantity,
-    minStockLevel: productData.minStockLevel,
-    maxStockLevel: productData.maxStockLevel,
-    isActive: true,
-    images: productData.images || [],
-    tags: productData.tags || [],
-    attributes: productData.attributes || {},
-    createdAt: now,
-    updatedAt: now,
-    correlationId
-  };
-  
-  products.set(productId, product);
-  
-  // Log business event
-  logger.info('Product created', {
-    eventType: 'product.created',
-    productId,
-    name: product.name,
-    sku: product.sku,
-    category: product.category,
-    price: product.price,
-    stockQuantity: product.stockQuantity,
-    timestamp: now,
-    correlationId
-  });
-  
-  res.status(201).json({ product, correlationId });
-});
-
-// PUT /api/v1/products/:id - Update product
-router.put('/:id', (req: Request, res: Response): void => {
-  const correlationId = (req as any).correlationId || 'unknown';
-  const productId = req.params.id;
-  const updateData: UpdateProductRequest = req.body;
-  
-  logger.info('Updating product', { productId, updateData, correlationId });
-  
-  const existingProduct = products.get(productId);
-  
-  if (!existingProduct) {
-    res.status(404).json({
-      error: 'Product not found',
-      productId,
-      correlationId
-    });
-    return;
-  }
-  
-  const updatedProduct: Product = {
-    ...existingProduct,
-    ...updateData,
-    updatedAt: new Date(),
-    correlationId
-  };
-  
-  products.set(productId, updatedProduct);
-  
-  // Log business event
-  logger.info('Product updated', {
-    eventType: 'product.updated',
-    productId,
-    name: updatedProduct.name,
-    sku: updatedProduct.sku,
-    changes: updateData,
-    timestamp: new Date(),
-    correlationId
-  });
-  
-  res.json({ product: updatedProduct, correlationId });
-});
-
-// PATCH /api/v1/products/:id/stock - Update stock
-router.patch('/:id/stock', (req: Request, res: Response): void => {
-  const correlationId = (req as any).correlationId || 'unknown';
-  const productId = req.params.id;
-  const { quantity, operation, reason } = req.body;
-  
-  logger.info('Updating product stock', { productId, quantity, operation, reason, correlationId });
-  
-  const product = products.get(productId);
-  
-  if (!product) {
-    res.status(404).json({
-      error: 'Product not found',
-      productId,
-      correlationId
-    });
-    return;
-  }
-  
-  const oldQuantity = product.stockQuantity;
-  let newQuantity = oldQuantity;
-  
-  switch (operation) {
-    case 'add':
-      newQuantity = oldQuantity + quantity;
-      break;
-    case 'subtract':
-      newQuantity = Math.max(0, oldQuantity - quantity);
-      break;
-    case 'set':
-      newQuantity = quantity;
-      break;
-    default:
-      res.status(400).json({
-        error: 'Invalid operation',
-        operation,
+  try {
+    logger.info('Fetching product by ID', { productId, correlationId });
+    
+    const product = await db.getProductById(productId);
+    
+    if (!product) {
+      res.status(404).json({
+        error: 'Product not found',
+        productId,
         correlationId
       });
       return;
+    }
+    
+    res.json({ product, correlationId });
+  } catch (error) {
+    logger.error('Error fetching product by ID:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch product',
+      correlationId
+    });
   }
-  
-  const updatedProduct: Product = {
-    ...product,
-    stockQuantity: newQuantity,
-    updatedAt: new Date(),
-    correlationId
-  };
-  
-  products.set(productId, updatedProduct);
-  
-  // Log business event
-  logger.info('Stock updated', {
-    eventType: 'stock.updated',
-    productId,
-    productName: product.name,
-    oldQuantity,
-    newQuantity,
-    operation,
-    reason,
-    timestamp: new Date(),
-    correlationId
-  });
-  
-  res.json({ product: updatedProduct, correlationId });
 });
 
-// DELETE /api/v1/products/:id - Deactivate product
-router.delete('/:id', (req: Request, res: Response): void => {
+// GET /api/v1/products/sku/:sku - Get product by SKU
+router.get('/sku/:sku', async (req: Request, res: Response): Promise<void> => {
+  const correlationId = (req as any).correlationId || 'unknown';
+  const sku = req.params.sku;
+  
+  try {
+    logger.info('Fetching product by SKU', { sku, correlationId });
+    
+    const product = await db.getProductBySku(sku);
+    
+    if (!product) {
+      res.status(404).json({
+        error: 'Product not found',
+        sku,
+        correlationId
+      });
+      return;
+    }
+    
+    res.json({ product, correlationId });
+  } catch (error) {
+    logger.error('Error fetching product by SKU:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch product',
+      correlationId
+    });
+  }
+});
+
+// POST /api/v1/products - Create new product
+router.post('/', async (req: Request, res: Response): Promise<void> => {
+  const correlationId = (req as any).correlationId || 'unknown';
+  
+  try {
+    const productData: CreateProductRequest = req.body;
+    
+    logger.info('Creating new product', { productData, correlationId });
+    
+    const product = await db.createProduct(productData);
+    
+    // Log business event
+    logger.info('Product created', {
+      eventType: 'product.created',
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      category: product.category,
+      price: product.price,
+      stock_quantity: product.stock_quantity,
+      timestamp: new Date(),
+      correlationId
+    });
+    
+    res.status(201).json({ product, correlationId });
+  } catch (error) {
+    logger.error('Error creating product:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to create product',
+      correlationId
+    });
+  }
+});
+
+// PUT /api/v1/products/:id - Update product
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   const correlationId = (req as any).correlationId || 'unknown';
   const productId = req.params.id;
-  const { reason = 'Manual deactivation' } = req.body;
   
-  logger.info('Deactivating product', { productId, reason, correlationId });
+  try {
+    const updateData: UpdateProductRequest = req.body;
+    
+    logger.info('Updating product', { productId, updateData, correlationId });
+    
+    const product = await db.updateProduct(productId, updateData);
+    
+    if (!product) {
+      res.status(404).json({
+        error: 'Product not found',
+        productId,
+        correlationId
+      });
+      return;
+    }
+    
+    // Log business event
+    logger.info('Product updated', {
+      eventType: 'product.updated',
+      productId,
+      name: product.name,
+      sku: product.sku,
+      changes: updateData,
+      timestamp: new Date(),
+      correlationId
+    });
+    
+    res.json({ product, correlationId });
+  } catch (error) {
+    logger.error('Error updating product:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to update product',
+      correlationId
+    });
+  }
+});
+
+// DELETE /api/v1/products/:id - Soft delete product
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  const correlationId = (req as any).correlationId || 'unknown';
+  const productId = req.params.id;
   
-  const product = products.get(productId);
-  
-  if (!product) {
-    res.status(404).json({
-      error: 'Product not found',
+  try {
+    logger.info('Deleting product', { productId, correlationId });
+    
+    const success = await db.deleteProduct(productId);
+    
+    if (!success) {
+      res.status(404).json({
+        error: 'Product not found',
+        productId,
+        correlationId
+      });
+      return;
+    }
+    
+    // Log business event
+    logger.info('Product deleted', {
+      eventType: 'product.deleted',
+      productId,
+      timestamp: new Date(),
+      correlationId
+    });
+    
+    res.json({
+      message: 'Product deleted successfully',
       productId,
       correlationId
     });
-    return;
+  } catch (error) {
+    logger.error('Error deleting product:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to delete product',
+      correlationId
+    });
   }
+});
+
+// GET /api/v1/products/stats - Get product statistics
+router.get('/stats', async (req: Request, res: Response): Promise<void> => {
+  const correlationId = (req as any).correlationId || 'unknown';
   
-  const updatedProduct: Product = {
-    ...product,
-    isActive: false,
-    updatedAt: new Date(),
-    correlationId
-  };
-  
-  products.set(productId, updatedProduct);
-  
-  // Log business event
-  logger.info('Product deactivated', {
-    eventType: 'product.deactivated',
-    productId,
-    name: product.name,
-    sku: product.sku,
-    reason,
-    timestamp: new Date(),
-    correlationId
-  });
-  
-  res.json({ product: updatedProduct, correlationId });
+  try {
+    logger.info('Fetching product statistics', { correlationId });
+    
+    const stats = await db.getProductStats();
+    
+    res.json({
+      stats,
+      correlationId
+    });
+  } catch (error) {
+    logger.error('Error fetching product stats:', error instanceof Error ? error : new Error(String(error)));
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch product statistics',
+      correlationId
+    });
+  }
 });
 
 export default router; 
