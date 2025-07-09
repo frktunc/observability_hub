@@ -40,9 +40,9 @@ export class ObservabilityLogger {
       serviceName: config.serviceName,
       serviceVersion: config.serviceVersion || '1.0.0',
       environment: config.environment || 'development',
-      rabbitmqHostname: config.rabbitmqHostname || 'localhost',
+      rabbitmqHostname: config.rabbitmqHostname || 'obs_rabbitmq',
       rabbitmqPort: config.rabbitmqPort || 5672,
-      rabbitmqVhost: config.rabbitmqVhost || 'observability',
+      rabbitmqVhost: config.rabbitmqVhost || '/',
       rabbitmqExchange: config.rabbitmqExchange || 'logs.topic',
       connectionTimeout: config.connectionTimeout || 30000,
       heartbeat: config.heartbeat || 60,
@@ -437,4 +437,3 @@ export class ObservabilityLogger {
     this.metrics.connectionStatus = 'disconnected';
   }
 }
- 

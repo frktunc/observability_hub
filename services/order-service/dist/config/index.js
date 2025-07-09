@@ -24,7 +24,7 @@ const configSchema = zod_1.z.object({
     DATABASE_POOL_MAX: zod_1.z.coerce.number().default(10),
     DATABASE_TIMEOUT: zod_1.z.coerce.number().default(5000),
     RABBITMQ_URL: zod_1.z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
-    RABBITMQ_VHOST: zod_1.z.string().default('/observability'),
+    RABBITMQ_VHOST: zod_1.z.string().default('/'),
     RABBITMQ_EXCHANGE: zod_1.z.string().default('logs.topic'),
     RABBITMQ_CONNECTION_TIMEOUT: zod_1.z.coerce.number().default(30000),
     RABBITMQ_HEARTBEAT: zod_1.z.coerce.number().default(60),

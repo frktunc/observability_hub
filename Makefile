@@ -195,7 +195,7 @@ test: ## Run integration tests
 
 test-rabbitmq: ## Test RabbitMQ message publishing
 	@echo "🐰 Testing RabbitMQ message publishing..."
-	@docker-compose exec rabbitmq rabbitmqctl list_queues -p /observability
+	@docker-compose exec rabbitmq rabbitmqctl list_queues -p /
 
 test-postgres: ## Test PostgreSQL connection and queries
 	@echo "🐘 Testing PostgreSQL..."

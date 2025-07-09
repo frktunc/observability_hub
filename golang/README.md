@@ -24,7 +24,7 @@ Servis tamamen ortam değişkenleri (environment variables) aracılığıyla yap
 
 | Ortam Değişkeni | Açıklama | `docker-compose.yml` içindeki Değer |
 | --- | --- | --- |
-| `RABBITMQ_URL` | RabbitMQ için bağlantı adresi. | `amqp://obs_user:obs_password@rabbitmq:5672//observability` |
+| `RABBITMQ_URL` | RabbitMQ için bağlantı adresi. | `amqp://obs_user:obs_password@rabbitmq:5672/` |
 | `POSTGRES_URL` | PostgreSQL için bağlantı adresi. | `postgres://obs_user:obs_password@postgres:5432/observability_db?sslmode=disable` |
 | `COLLECTOR_BATCH_SIZE` | Veritabanına yazılmadan önce biriktirilecek mesaj sayısı. | `500` |
 | `COLLECTOR_BATCH_TIMEOUT` | Biriktirilen mesajları veritabanına yazmak için maksimum bekleme süresi. | `5s` |

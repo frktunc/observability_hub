@@ -19,7 +19,7 @@ const logger = new ObservabilityLogger({
   serviceName: 'product-service',
   serviceVersion: '1.0.0',
   environment: 'development',
-  rabbitmqUrl: 'amqp://localhost:5672',
+  rabbitmqUrl: 'amqp://obs_user:obs_password@obs_rabbitmq:5672/',
   rabbitmqVhost: '/',
   rabbitmqExchange: 'logs',
   defaultLogLevel: 'INFO' as any,

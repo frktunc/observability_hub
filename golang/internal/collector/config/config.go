@@ -51,7 +51,7 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://obs_user:obs_password@localhost:5672/"),
+		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://obs_user:obs_password@obs_rabbitmq:5672/"),
 		PostgresURL:     getEnv("POSTGRES_URL", "postgres://user:password@localhost:5432/logs?sslmode=disable"),
 		QueueName:       getEnv("RABBITMQ_QUEUE_NAME", "log_events"),
 		DLXName:         getEnv("RABBITMQ_DLX_NAME", "log_events_dlx"),

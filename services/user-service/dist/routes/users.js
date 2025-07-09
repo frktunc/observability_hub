@@ -26,7 +26,7 @@ exports.userRoutes = router;
 // Initialize logger
 const logger = new log_client_1.ObservabilityLogger({
     serviceName: 'user-service',
-    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
+    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://obs_user:obs_password@obs_rabbitmq:5672/',
 });
 // GET /api/v1/users - List all users
 router.get('/', async (req, res) => {
