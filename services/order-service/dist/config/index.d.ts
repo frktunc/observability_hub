@@ -14,6 +14,10 @@ export declare const config: {
     DATABASE_POOL_MAX: number;
     DATABASE_TIMEOUT: number;
     RABBITMQ_URL: string;
+    RABBITMQ_HOSTNAME: string;
+    RABBITMQ_PORT: number;
+    RABBITMQ_USER: string;
+    RABBITMQ_PASSWORD: string;
     RABBITMQ_VHOST: string;
     RABBITMQ_EXCHANGE: string;
     RABBITMQ_CONNECTION_TIMEOUT: number;
@@ -53,7 +57,6 @@ export declare const derivedConfig: {
     isDevelopment: boolean;
     isProduction: boolean;
     httpUrl: string;
-   
     metricsUrl: string;
     database: {
         url: string;
@@ -70,6 +73,10 @@ export declare const derivedConfig: {
     };
     rabbitmq: {
         url: string;
+        hostname: string;
+        port: number;
+        user: string;
+        password: string;
         vhost: string;
         exchange: string;
         routingKeys: {
@@ -88,7 +95,6 @@ export declare const derivedConfig: {
             retryDelayMs: number;
         };
     };
-   
 };
 export declare const validateConfiguration: () => void;
 export type Config = typeof config;

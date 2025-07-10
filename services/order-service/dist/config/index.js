@@ -23,19 +23,17 @@ const configSchema = zod_1.z.object({
     DATABASE_POOL_MIN: zod_1.z.coerce.number().default(2),
     DATABASE_POOL_MAX: zod_1.z.coerce.number().default(10),
     DATABASE_TIMEOUT: zod_1.z.coerce.number().default(5000),
-    RABBITMQ_URL: zod_1.z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
-    RABBITMQ_VHOST: zod_1.z.string().default('/'),
+    RABBITMQ_URL: zod_1.z.string().nonempty(),
+    RABBITMQ_HOSTNAME: zod_1.z.string().default('rabbitmq'),
+    RABBITMQ_PORT: zod_1.z.coerce.number().default(5672),
+    RABBITMQ_USER: zod_1.z.string().default('obs_user'),
+    RABBITMQ_PASSWORD: zod_1.z.string().default('obs_password'),
+    RABBITMQ_VHOST: zod_1.z.string().nonempty(),
     RABBITMQ_EXCHANGE: zod_1.z.string().default('logs.topic'),
     RABBITMQ_CONNECTION_TIMEOUT: zod_1.z.coerce.number().default(30000),
     RABBITMQ_HEARTBEAT: zod_1.z.coerce.number().default(60),
     RABBITMQ_MAX_RETRIES: zod_1.z.coerce.number().default(5),
     RABBITMQ_RETRY_DELAY: zod_1.z.coerce.number().default(2000),
-    GRPC_PORT: zod_1.z.coerce.number().min(1).max(65535).default(50052),
-    GRPC_HOST: zod_1.z.string().default('0.0.0.0'),
-    GRPC_MAX_RECEIVE_MESSAGE_LENGTH: zod_1.z.coerce.number().default(4 * 1024 * 1024),
-    GRPC_MAX_SEND_MESSAGE_LENGTH: zod_1.z.coerce.number().default(4 * 1024 * 1024),
-    GRPC_KEEPALIVE_TIME: zod_1.z.coerce.number().default(30000),
-    GRPC_KEEPALIVE_TIMEOUT: zod_1.z.coerce.number().default(5000),
     LOG_LEVEL: zod_1.z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info'),
     LOG_FORMAT: zod_1.z.enum(['json', 'pretty']).default('json'),
     LOG_MAX_FILE_SIZE: zod_1.z.string().default('20m'),
@@ -84,7 +82,6 @@ exports.derivedConfig = {
     isDevelopment: exports.config.NODE_ENV === 'development',
     isProduction: exports.config.NODE_ENV === 'production',
     httpUrl: `http://${exports.config.HOST}:${exports.config.PORT}`,
-    grpcUrl: `${exports.config.GRPC_HOST}:${exports.config.GRPC_PORT}`,
     metricsUrl: `http://${exports.config.HOST}:${exports.config.METRICS_PORT}${exports.config.METRICS_PATH}`,
     database: {
         url: exports.config.DATABASE_URL,
@@ -101,6 +98,10 @@ exports.derivedConfig = {
     },
     rabbitmq: {
         url: exports.config.RABBITMQ_URL,
+        hostname: exports.config.RABBITMQ_HOSTNAME,
+        port: exports.config.RABBITMQ_PORT,
+        user: exports.config.RABBITMQ_USER,
+        password: exports.config.RABBITMQ_PASSWORD,
         vhost: exports.config.RABBITMQ_VHOST,
         exchange: exports.config.RABBITMQ_EXCHANGE,
         routingKeys: {
@@ -119,18 +120,6 @@ exports.derivedConfig = {
             retryDelayMs: exports.config.RABBITMQ_RETRY_DELAY,
         }
     },
-    grpc: {
-        options: {
-            'grpc.keepalive_time_ms': exports.config.GRPC_KEEPALIVE_TIME,
-            'grpc.keepalive_timeout_ms': exports.config.GRPC_KEEPALIVE_TIMEOUT,
-            'grpc.keepalive_permit_without_calls': true,
-            'grpc.http2.max_pings_without_data': 0,
-            'grpc.http2.min_time_between_pings_ms': 10000,
-            'grpc.http2.min_ping_interval_without_data_ms': 5 * 60 * 1000,
-            'grpc.max_receive_message_length': exports.config.GRPC_MAX_RECEIVE_MESSAGE_LENGTH,
-            'grpc.max_send_message_length': exports.config.GRPC_MAX_SEND_MESSAGE_LENGTH,
-        }
-    }
 };
 const validateConfiguration = () => {
     console.log('🔧 Configuration validated successfully');
@@ -138,7 +127,6 @@ const validateConfiguration = () => {
         console.log('📋 Configuration summary:');
         console.log(`  Service: ${exports.config.SERVICE_NAME}@${exports.config.SERVICE_VERSION}`);
         console.log(`  HTTP: ${exports.derivedConfig.httpUrl}`);
-        console.log(`  gRPC: ${exports.derivedConfig.grpcUrl}`);
         console.log(`  Environment: ${exports.config.NODE_ENV}`);
         console.log(`  Log Level: ${exports.config.LOG_LEVEL}`);
         console.log(`  RabbitMQ: ${exports.config.RABBITMQ_URL}`);

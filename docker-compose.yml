@@ -13,6 +13,8 @@ volumes:
     driver: local
   product_service_db_data:
     driver: local
+  order_service_db_data:
+    driver: local
   rabbitmq_data:
     driver: local
   grafana_data:
@@ -242,7 +244,36 @@ services:
         reservations:
           memory: 64M
 
-  # Order Service (Log Producer Example)
+  # Order Service Database
+  order_service_db:
+    image: postgres:15-alpine
+    container_name: obs_order_service_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ORDER_SERVICE_DB_NAME:-order_service_db}
+      POSTGRES_USER: ${ORDER_SERVICE_DB_USER:-order_service_user}
+      POSTGRES_PASSWORD: ${ORDER_SERVICE_DB_PASSWORD:-order_service_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - order_service_db_data:/var/lib/postgresql/data
+      - ./infrastructure/order-service/db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "${ORDER_SERVICE_DB_PORT:-5436}:5432"
+    networks:
+      - observability
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDER_SERVICE_DB_USER:-order_service_user} -d ${ORDER_SERVICE_DB_NAME:-order_service_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Order Service
   order-service:
     build:
       context: .
@@ -251,6 +282,7 @@ services:
     restart: unless-stopped
     depends_on:
       - rabbitmq
+      - order_service_db
       - jaeger
     networks:
       - observability
@@ -262,6 +294,7 @@ services:
       - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-obs_password}
       - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - DATABASE_URL=postgresql://${ORDER_SERVICE_DB_USER:-order_service_user}:${ORDER_SERVICE_DB_PASSWORD:-order_service_password}@order_service_db:5432/${ORDER_SERVICE_DB_NAME:-order_service_db}
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
     ports:
@@ -382,5 +415,6 @@ services:
       - grafana
       - redis
       - product-service
+      - order-service
     networks:
       - observability
