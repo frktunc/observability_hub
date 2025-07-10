@@ -8,7 +8,7 @@ dotenv.config();
 const configSchema = z.object({
   // Application
   NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
-  PORT: z.coerce.number().min(1).max(65535).default(3000),
+  PORT: z.coerce.number().min(1).max(65535).default(8081),
   HOST: z.string().default('0.0.0.0'),
   
   // Service Identity

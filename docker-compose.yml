@@ -321,7 +321,7 @@ services:
       - observability
     environment:
       - NODE_ENV=development
-      - PORT=3004
+      - PORT=8081
       - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-obs_password}
       - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
@@ -331,7 +331,7 @@ services:
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
     ports:
-      - "3004:3004"
+      - "8081:8081"
     deploy:
       resources:
         limits:
@@ -383,7 +383,7 @@ services:
       - observability
     environment:
       - NODE_ENV=development
-      - PORT=3003
+      - PORT=8082
       - RABBITMQ_USER=${RABBITMQ_USER:-obs_user}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-obs_password}
       - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
@@ -393,7 +393,7 @@ services:
       - JAEGER_AGENT_HOST=jaeger
       - JAEGER_AGENT_PORT=6832
     ports:
-      - "3003:3003"
+      - "8082:8082"
     deploy:
       resources:
         limits:
