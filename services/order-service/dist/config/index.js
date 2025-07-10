@@ -9,7 +9,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const configSchema = zod_1.z.object({
     NODE_ENV: zod_1.z.enum(['development', 'staging', 'production']).default('development'),
-    PORT: zod_1.z.coerce.number().min(1).max(65535).default(3002),
+    PORT: zod_1.z.coerce.number().min(1).max(65535).default(8080),
     HOST: zod_1.z.string().default('0.0.0.0'),
     SERVICE_NAME: zod_1.z.string().default('order-service'),
     SERVICE_VERSION: zod_1.z.string().default('1.0.0'),

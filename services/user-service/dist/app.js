@@ -11,15 +11,13 @@ const helmet_1 = __importDefault(require("helmet"));
 const compression_1 = __importDefault(require("compression"));
 const log_client_1 = require("@observability-hub/log-client");
 const config_1 = require("./config");
-const metrics_1 = require("./middleware/metrics");
-const request_logging_1 = require("./middleware/request-logging");
-const error_handler_1 = require("./middleware/error-handler");
-const correlation_id_1 = require("./middleware/correlation-id");
+// Import shared middleware (NO MORE COPY-PASTE!)
+const shared_middleware_1 = require("@observability-hub/shared-middleware");
 const rate_limiting_1 = require("./middleware/rate-limiting");
 const redis_client_1 = require("./services/redis-client");
 const health_1 = require("./routes/health");
 const users_1 = require("./routes/users");
-const metrics_2 = require("./routes/metrics");
+const metrics_1 = require("./routes/metrics");
 // Initialize observability logger
 const logger = new log_client_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
@@ -94,17 +92,21 @@ function createApp() {
         const rateLimitMiddleware = (0, rate_limiting_1.createRateLimitMiddleware)();
         app.use(rateLimitMiddleware);
     }
-    // Custom middleware
-    app.use(correlation_id_1.correlationIdMiddleware);
-    app.use(request_logging_1.requestLoggingMiddleware);
+    // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
+    app.use(shared_middleware_1.defaultCorrelationIdMiddleware);
+    app.use((0, shared_middleware_1.requestLoggingMiddleware)({
+        customLogger: (level, message, metadata) => {
+            console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
+        }
+    }));
     if (config_1.config.METRICS_ENABLED) {
-        app.use(metrics_1.metricsMiddleware);
+        app.use(shared_middleware_1.defaultMetrics);
     }
     // Health check endpoint (before authentication)
     app.use('/health', health_1.healthRoutes);
     // Metrics endpoint
     if (config_1.config.METRICS_ENABLED) {
-        app.use('/metrics', metrics_2.metricsRoutes);
+        app.use('/metrics', metrics_1.metricsRoutes);
     }
     // API routes
     app.use('/api/v1/users', users_1.userRoutes);
@@ -299,8 +301,8 @@ function createApp() {
             },
         });
     });
-    // Error handling middleware (must be last)
-    app.use(error_handler_1.errorHandler);
+    // Error handling middleware (must be last) - using shared middleware
+    app.use(shared_middleware_1.defaultErrorHandler);
     return app;
 }
 //# sourceMappingURL=app.js.map

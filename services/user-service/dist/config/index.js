@@ -12,7 +12,7 @@ dotenv_1.default.config();
 const configSchema = zod_1.z.object({
     // Application
     NODE_ENV: zod_1.z.enum(['development', 'staging', 'production']).default('development'),
-    PORT: zod_1.z.coerce.number().min(1).max(65535).default(3000),
+    PORT: zod_1.z.coerce.number().min(1).max(65535).default(8081),
     HOST: zod_1.z.string().default('0.0.0.0'),
     // Service Identity
     SERVICE_NAME: zod_1.z.string().default('user-service'),

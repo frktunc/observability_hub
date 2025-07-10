@@ -3,7 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { config, derivedConfig, validateConfiguration } from './config';
-import { ObservabilityLogger } from '@observability-hub/log-client';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from './services/database';
 
@@ -12,22 +11,21 @@ import healthRoutes from './routes/health';
 import metricsRoutes from './routes/metrics';
 import productsRoutes from './routes/products';
 
-// Import middleware
-import { correlationIdMiddleware } from './middleware/correlation-id';
-import { errorHandlerMiddleware } from './middleware/error-handler';
-import { requestLoggingMiddleware } from './middleware/request-logging';
-import { metricsMiddleware } from './middleware/metrics';
+// Import shared middleware (NO MORE COPY-PASTE!)
+import { 
+  defaultCorrelationIdMiddleware,
+  defaultErrorHandler,
+  requestLoggingMiddleware,
+  defaultMetrics
+} from '@observability-hub/shared-middleware';
 
-// Initialize logger
-const logger = new ObservabilityLogger({
-  serviceName: config.SERVICE_NAME,
-  serviceVersion: config.SERVICE_VERSION,
-  environment: config.NODE_ENV,
-  rabbitmqUrl: derivedConfig.rabbitmq.url,
-  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
-  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
-  defaultLogLevel: config.LOG_LEVEL as any,
-});
+// Simple console logger (replace with proper observability logger if needed)
+const logger = {
+  info: (message: string, metadata?: any) => console.log(`[INFO] ${message}`, metadata || ''),
+  warn: (message: string, metadata?: any) => console.warn(`[WARN] ${message}`, metadata || ''),
+  error: (message: string, metadata?: any) => console.error(`[ERROR] ${message}`, metadata || ''),
+  debug: (message: string, metadata?: any) => console.debug(`[DEBUG] ${message}`, metadata || '')
+};
 
 // Initialize Express app
 const app = express();
@@ -42,18 +40,22 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Custom middleware
-app.use(correlationIdMiddleware);
-app.use(requestLoggingMiddleware(logger));
-app.use(metricsMiddleware);
+// Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
+app.use(defaultCorrelationIdMiddleware);
+app.use(requestLoggingMiddleware({
+  customLogger: (level, message, metadata) => {
+    logger[level](message, metadata);
+  }
+}));
+app.use(defaultMetrics);
 
 // Routes
 app.use('/health', healthRoutes);
 app.use('/metrics', metricsRoutes);
 app.use('/api/v1/products', productsRoutes);
 
-// Error handling
-app.use(errorHandlerMiddleware);
+// Error handling (using shared middleware - NO MORE COPY-PASTE!)
+app.use(defaultErrorHandler);
 
 // Root endpoint
 app.get('/', (req, res) => {

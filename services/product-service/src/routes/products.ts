@@ -1,20 +1,16 @@
 import { Router, Request, Response } from 'express';
-import { ObservabilityLogger } from '@observability-hub/log-client';
 import { db, Product, CreateProductRequest, UpdateProductRequest, ProductFilters } from '../services/database';
 import { config } from '../config';
 
 const router = Router();
 
-// Initialize logger
-const logger = new ObservabilityLogger({
-  serviceName: config.SERVICE_NAME,
-  serviceVersion: config.SERVICE_VERSION,
-  environment: config.NODE_ENV,
-  rabbitmqUrl: 'amqp://obs_user:obs_password@obs_rabbitmq:5672/',
-  rabbitmqVhost: '/',
-  rabbitmqExchange: 'logs.topic',
-  defaultLogLevel: config.LOG_LEVEL as any,
-});
+// Simple console logger (replace with proper observability logger if needed)
+const logger = {
+  info: (message: string, metadata?: any) => console.log(`[INFO] ${message}`, metadata || ''),
+  warn: (message: string, metadata?: any) => console.warn(`[WARN] ${message}`, metadata || ''),
+  error: (message: string, metadata?: any) => console.error(`[ERROR] ${message}`, metadata || ''),
+  debug: (message: string, metadata?: any) => console.debug(`[DEBUG] ${message}`, metadata || '')
+};
 
 // GET /api/v1/products - List all products
 router.get('/', async (req: Request, res: Response): Promise<void> => {

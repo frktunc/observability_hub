@@ -9,7 +9,7 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const configSchema = zod_1.z.object({
     NODE_ENV: zod_1.z.enum(['development', 'staging', 'production']).default('development'),
-    PORT: zod_1.z.coerce.number().min(1).max(65535).default(3003),
+    PORT: zod_1.z.coerce.number().min(1).max(65535).default(8082),
     HOST: zod_1.z.string().default('0.0.0.0'),
     SERVICE_NAME: zod_1.z.string().default('product-service'),
     SERVICE_VERSION: zod_1.z.string().default('1.0.0'),
@@ -23,7 +23,11 @@ const configSchema = zod_1.z.object({
     DATABASE_POOL_MIN: zod_1.z.coerce.number().default(2),
     DATABASE_POOL_MAX: zod_1.z.coerce.number().default(10),
     DATABASE_TIMEOUT: zod_1.z.coerce.number().default(5000),
-    RABBITMQ_URL: zod_1.z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672/'),
+    RABBITMQ_URL: zod_1.z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
+    RABBITMQ_HOSTNAME: zod_1.z.string().default('rabbitmq'),
+    RABBITMQ_PORT: zod_1.z.coerce.number().default(5672),
+    RABBITMQ_USER: zod_1.z.string().default('obs_user'),
+    RABBITMQ_PASSWORD: zod_1.z.string().default('obs_password'),
     RABBITMQ_VHOST: zod_1.z.string().default('/'),
     RABBITMQ_EXCHANGE: zod_1.z.string().default('logs.topic'),
     RABBITMQ_CONNECTION_TIMEOUT: zod_1.z.coerce.number().default(30000),
@@ -119,7 +123,6 @@ const validateConfiguration = () => {
         console.log('📋 Configuration summary:');
         console.log(`  Service: ${exports.config.SERVICE_NAME}@${exports.config.SERVICE_VERSION}`);
         console.log(`  HTTP: ${exports.derivedConfig.httpUrl}`);
-        console.log(`  gRPC: ${exports.derivedConfig.grpcUrl}`);
         console.log(`  Environment: ${exports.config.NODE_ENV}`);
         console.log(`  Log Level: ${exports.config.LOG_LEVEL}`);
         console.log(`  RabbitMQ: ${exports.config.RABBITMQ_URL}`);

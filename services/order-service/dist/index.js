@@ -13,10 +13,7 @@ const database_1 = require("./services/database");
 const health_1 = __importDefault(require("./routes/health"));
 const metrics_1 = __importDefault(require("./routes/metrics"));
 const orders_1 = __importDefault(require("./routes/orders"));
-const correlation_id_1 = require("./middleware/correlation-id");
-const error_handler_1 = require("./middleware/error-handler");
-const request_logging_1 = require("./middleware/request-logging");
-const metrics_2 = require("./middleware/metrics");
+const shared_middleware_1 = require("@observability-hub/shared-middleware");
 const logger = new log_client_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
@@ -38,13 +35,17 @@ async function startServer() {
         app.use((0, compression_1.default)());
         app.use(express_1.default.json({ limit: '10mb' }));
         app.use(express_1.default.urlencoded({ extended: true }));
-        app.use(correlation_id_1.correlationIdMiddleware);
-        app.use((0, request_logging_1.requestLoggingMiddleware)(logger));
-        app.use(metrics_2.metricsMiddleware);
+        app.use(shared_middleware_1.defaultCorrelationIdMiddleware);
+        app.use((0, shared_middleware_1.requestLoggingMiddleware)({
+            customLogger: (level, message, metadata) => {
+                logger[level](message, metadata);
+            }
+        }));
+        app.use(shared_middleware_1.defaultMetrics);
         app.use('/health', health_1.default);
         app.use('/metrics', metrics_1.default);
         app.use('/api/v1/orders', orders_1.default);
-        app.use(error_handler_1.errorHandlerMiddleware);
+        app.use(shared_middleware_1.defaultErrorHandler);
         app.get('/', (req, res) => {
             res.json({
                 service: config_1.config.SERVICE_NAME,

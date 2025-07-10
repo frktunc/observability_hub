@@ -110,7 +110,7 @@ services:
       - COLLECTOR_RETRY_MAX=5
       - COLLECTOR_RETRY_INTERVAL=2s
       - METRICS_PORT=9090
-      - HEALTH_CHECK_PORT=8081
+      - HEALTH_CHECK_PORT=8083
       # Redis Configuration
       - REDIS_URL=redis://obs_redis:6379
       - REDIS_PASSWORD=
@@ -121,7 +121,7 @@ services:
       - REDIS_TTL=1h
     ports:
       - "9090:9090" # Prometheus Metrics
-      - "8081:8081" # Health Check
+      - "8083:8083" # Health Check
     networks:
       - observability
     deploy:

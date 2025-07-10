@@ -14,18 +14,16 @@ export declare const config: {
     DATABASE_POOL_MAX: number;
     DATABASE_TIMEOUT: number;
     RABBITMQ_URL: string;
+    RABBITMQ_HOSTNAME: string;
+    RABBITMQ_PORT: number;
+    RABBITMQ_USER: string;
+    RABBITMQ_PASSWORD: string;
     RABBITMQ_VHOST: string;
     RABBITMQ_EXCHANGE: string;
     RABBITMQ_CONNECTION_TIMEOUT: number;
     RABBITMQ_HEARTBEAT: number;
     RABBITMQ_MAX_RETRIES: number;
     RABBITMQ_RETRY_DELAY: number;
-    GRPC_PORT: number;
-    GRPC_HOST: string;
-    GRPC_MAX_RECEIVE_MESSAGE_LENGTH: number;
-    GRPC_MAX_SEND_MESSAGE_LENGTH: number;
-    GRPC_KEEPALIVE_TIME: number;
-    GRPC_KEEPALIVE_TIMEOUT: number;
     LOG_LEVEL: "error" | "warn" | "info" | "debug" | "trace";
     LOG_FORMAT: "json" | "pretty";
     LOG_MAX_FILE_SIZE: string;
@@ -59,7 +57,6 @@ export declare const derivedConfig: {
     isDevelopment: boolean;
     isProduction: boolean;
     httpUrl: string;
- 
     metricsUrl: string;
     database: {
         url: string;

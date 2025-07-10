@@ -5,10 +5,13 @@ import compression from 'compression';
 
 import { ObservabilityLogger } from '@observability-hub/log-client';
 import { config, derivedConfig } from './config';
-import { metricsMiddleware, metricsRegistry } from './middleware/metrics';
-import { requestLoggingMiddleware } from './middleware/request-logging';
-import { errorHandler } from './middleware/error-handler';
-import { correlationIdMiddleware } from './middleware/correlation-id';
+// Import shared middleware (NO MORE COPY-PASTE!)
+import { 
+  defaultCorrelationIdMiddleware,
+  defaultErrorHandler,
+  requestLoggingMiddleware,
+  defaultMetrics
+} from '@observability-hub/shared-middleware';
 import { createRateLimitMiddleware } from './middleware/rate-limiting';
 import { initializeRedis } from './services/redis-client';
 import { healthRoutes } from './routes/health';
@@ -97,12 +100,16 @@ export function createApp(): express.Application {
     app.use(rateLimitMiddleware);
   }
 
-  // Custom middleware
-  app.use(correlationIdMiddleware);
-  app.use(requestLoggingMiddleware);
+  // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
+  app.use(defaultCorrelationIdMiddleware);
+  app.use(requestLoggingMiddleware({
+    customLogger: (level, message, metadata) => {
+      console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
+    }
+  }));
   
   if (config.METRICS_ENABLED) {
-    app.use(metricsMiddleware);
+    app.use(defaultMetrics);
   }
 
   // Health check endpoint (before authentication)
@@ -309,8 +316,8 @@ export function createApp(): express.Application {
     });
   });
 
-  // Error handling middleware (must be last)
-  app.use(errorHandler);
+  // Error handling middleware (must be last) - using shared middleware
+  app.use(defaultErrorHandler);
 
   return app;
 }
