@@ -1,0 +1,255 @@
+package storage
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"observability_hub/golang/internal/collector/config"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
+)
+
+// RedisClient wraps the Redis client with additional functionality for the collector
+type RedisClient struct {
+	client *redis.Client
+	cfg    *config.Config
+	logger *zap.Logger
+	ctx    context.Context
+}
+
+// MetadataKey represents a cache key for metadata
+type MetadataKey struct {
+	Service     string
+	Version     string
+	Environment string
+}
+
+// CachedMetadata represents cached service metadata
+type CachedMetadata struct {
+	ServiceID   string                 `json:"service_id"`
+	Environment string                 `json:"environment"`
+	Version     string                 `json:"version"`
+	Attributes  map[string]interface{} `json:"attributes"`
+	CachedAt    time.Time              `json:"cached_at"`
+}
+
+// NewRedisClient creates a new Redis client instance
+func NewRedisClient(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*RedisClient, error) {
+	opts, err := redis.ParseURL(cfg.RedisURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
+	}
+
+	// Override with config values
+	opts.Password = cfg.RedisPassword
+	opts.DB = cfg.RedisDB
+	opts.PoolSize = cfg.RedisPoolSize
+	opts.MinIdleConns = cfg.RedisMinIdle
+	opts.MaxRetries = cfg.RedisMaxRetries
+
+	client := redis.NewClient(opts)
+
+	// Test connection
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+
+	redisClient := &RedisClient{
+		client: client,
+		cfg:    cfg,
+		logger: logger.Named("redis"),
+		ctx:    ctx,
+	}
+
+	logger.Info("Redis client connected successfully",
+		zap.String("url", cfg.RedisURL),
+		zap.Int("db", cfg.RedisDB),
+		zap.Int("pool_size", cfg.RedisPoolSize))
+
+	return redisClient, nil
+}
+
+// HealthCheck checks Redis connection health
+func (r *RedisClient) HealthCheck() error {
+	return r.client.Ping(r.ctx).Err()
+}
+
+// Close closes the Redis connection
+func (r *RedisClient) Close() error {
+	return r.client.Close()
+}
+
+// generateMetadataKey creates a Redis key for metadata caching
+func (r *RedisClient) generateMetadataKey(service, version, environment string) string {
+	return fmt.Sprintf("collector:metadata:%s:%s:%s", service, version, environment)
+}
+
+// CacheMetadata stores service metadata in Redis
+func (r *RedisClient) CacheMetadata(service, version, environment string, metadata *CachedMetadata) error {
+	key := r.generateMetadataKey(service, version, environment)
+
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	err = r.client.Set(r.ctx, key, data, r.cfg.RedisTTL).Err()
+	if err != nil {
+		return fmt.Errorf("failed to cache metadata: %w", err)
+	}
+
+	r.logger.Debug("Cached metadata",
+		zap.String("service", service),
+		zap.String("version", version),
+		zap.String("environment", environment),
+		zap.String("key", key))
+
+	return nil
+}
+
+// GetCachedMetadata retrieves service metadata from Redis
+func (r *RedisClient) GetCachedMetadata(service, version, environment string) (*CachedMetadata, error) {
+	key := r.generateMetadataKey(service, version, environment)
+
+	data, err := r.client.Get(r.ctx, key).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return nil, nil // Cache miss
+		}
+		return nil, fmt.Errorf("failed to get cached metadata: %w", err)
+	}
+
+	var metadata CachedMetadata
+	if err := json.Unmarshal([]byte(data), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal cached metadata: %w", err)
+	}
+
+	r.logger.Debug("Retrieved cached metadata",
+		zap.String("service", service),
+		zap.String("version", version),
+		zap.String("environment", environment))
+
+	return &metadata, nil
+}
+
+// generateDeduplicationKey creates a Redis key for message deduplication
+// Only checks for exact duplicate events (same EventID + CorrelationID)
+func (r *RedisClient) generateDeduplicationKey(event *LogEvent) string {
+	// Use only EventID and CorrelationID for true duplicate detection
+	// Different requests should have different EventID/CorrelationID
+	// even if message content is similar
+	return fmt.Sprintf("collector:dedup:%s:%s", event.EventID, event.CorrelationID)
+}
+
+// CheckDuplication checks if a message has already been processed
+func (r *RedisClient) CheckDuplication(event *LogEvent) (bool, error) {
+	key := r.generateDeduplicationKey(event)
+
+	exists, err := r.client.Exists(r.ctx, key).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to check duplication: %w", err)
+	}
+
+	return exists > 0, nil
+}
+
+// MarkAsProcessed marks a message as processed for deduplication
+func (r *RedisClient) MarkAsProcessed(event *LogEvent) error {
+	key := r.generateDeduplicationKey(event)
+
+	// Store with a shorter TTL for deduplication (e.g., 24 hours)
+	deduplicationTTL := 24 * time.Hour
+
+	err := r.client.Set(r.ctx, key, event.EventID, deduplicationTTL).Err()
+	if err != nil {
+		return fmt.Errorf("failed to mark as processed: %w", err)
+	}
+
+	r.logger.Debug("Marked event as processed",
+		zap.String("event_id", event.EventID),
+		zap.String("key", key))
+
+	return nil
+}
+
+// IncrementBatchCounter increments the batch processing counter
+func (r *RedisClient) IncrementBatchCounter(service string) error {
+	key := fmt.Sprintf("collector:batch_count:%s", service)
+
+	err := r.client.Incr(r.ctx, key).Err()
+	if err != nil {
+		return fmt.Errorf("failed to increment batch counter: %w", err)
+	}
+
+	// Set expiry for the counter
+	r.client.Expire(r.ctx, key, time.Hour)
+
+	return nil
+}
+
+// GetBatchCounter gets the current batch processing count for a service
+func (r *RedisClient) GetBatchCounter(service string) (int64, error) {
+	key := fmt.Sprintf("collector:batch_count:%s", service)
+
+	count, err := r.client.Get(r.ctx, key).Int64()
+	if err != nil {
+		if err == redis.Nil {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to get batch counter: %w", err)
+	}
+
+	return count, nil
+}
+
+// CacheConfiguration stores runtime configuration in Redis
+func (r *RedisClient) CacheConfiguration(key string, value interface{}) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("failed to marshal configuration: %w", err)
+	}
+
+	configKey := fmt.Sprintf("collector:config:%s", key)
+	err = r.client.Set(r.ctx, configKey, data, r.cfg.RedisTTL).Err()
+	if err != nil {
+		return fmt.Errorf("failed to cache configuration: %w", err)
+	}
+
+	return nil
+}
+
+// GetCachedConfiguration retrieves runtime configuration from Redis
+func (r *RedisClient) GetCachedConfiguration(key string, dest interface{}) error {
+	configKey := fmt.Sprintf("collector:config:%s", key)
+
+	data, err := r.client.Get(r.ctx, configKey).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return fmt.Errorf("configuration not found: %s", key)
+		}
+		return fmt.Errorf("failed to get cached configuration: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(data), dest); err != nil {
+		return fmt.Errorf("failed to unmarshal cached configuration: %w", err)
+	}
+
+	return nil
+}
+
+// GetConnectionInfo returns Redis connection information for monitoring
+func (r *RedisClient) GetConnectionInfo() map[string]interface{} {
+	stats := r.client.PoolStats()
+
+	return map[string]interface{}{
+		"pool_size":    r.cfg.RedisPoolSize,
+		"min_idle":     r.cfg.RedisMinIdle,
+		"db":           r.cfg.RedisDB,
+		"ttl":          r.cfg.RedisTTL.String(),
+		"active_conns": stats.TotalConns,
+		"idle_conns":   stats.IdleConns,
+		"stale_conns":  stats.StaleConns,
+	}
+}

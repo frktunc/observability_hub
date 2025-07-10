@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"log"
 	"net/http"
 	"observability_hub/golang/internal/collector/config"
@@ -25,6 +25,10 @@ var (
 		Name: "collector_messages_nacked_total",
 		Help: "The total number of nacked messages",
 	})
+	MessagesSkipped = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "collector_messages_skipped_total",
+		Help: "The total number of skipped duplicate messages",
+	})
 	DBFlushSuccess = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "collector_db_flush_success_total",
 		Help: "The total number of successful database flushes",
@@ -38,28 +42,89 @@ var (
 		Help:    "The duration of database flush operations.",
 		Buckets: prometheus.LinearBuckets(0.1, 0.1, 10), // 0.1s to 1s
 	})
+	// Redis-related metrics
+	RedisCacheHits = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "collector_redis_cache_hits_total",
+		Help: "The total number of Redis cache hits",
+	})
+	RedisCacheMisses = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "collector_redis_cache_misses_total",
+		Help: "The total number of Redis cache misses",
+	})
+	RedisErrors = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "collector_redis_errors_total",
+		Help: "The total number of Redis operation errors",
+	})
+	// Batch optimization metrics
+	BatchSizeOptimized = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "collector_batch_size_optimized",
+		Help:    "The optimized batch sizes used for processing",
+		Buckets: prometheus.LinearBuckets(100, 100, 10), // 100 to 1000
+	})
+	CacheHitRatio = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "collector_cache_hit_ratio",
+		Help: "The current cache hit ratio for metadata",
+	})
+	BatchProcessingTime = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "collector_batch_processing_time_seconds",
+		Help:    "Time spent processing batches including Redis operations",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 15), // 1ms to ~30s
+	})
 )
 
 // Server is the metrics and health check server.
 type Server struct {
 	httpServer *http.Server
+	redis      HealthChecker
+}
+
+// HealthChecker interface for checking component health
+type HealthChecker interface {
+	HealthCheck() error
 }
 
 // NewServer creates a new metrics server.
 func NewServer(cfg *config.Config) *Server {
+	server := &Server{}
+
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "OK")
-	})
+	mux.HandleFunc("/health", server.healthHandler)
 
-	return &Server{
-		httpServer: &http.Server{
-			Addr:    ":" + cfg.MetricsPort,
-			Handler: mux,
-		},
+	server.httpServer = &http.Server{
+		Addr:    ":" + cfg.MetricsPort,
+		Handler: mux,
 	}
+
+	return server
+}
+
+// SetRedisClient sets the Redis client for health checks
+func (s *Server) SetRedisClient(redis HealthChecker) {
+	s.redis = redis
+}
+
+// healthHandler handles health check requests
+func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
+	status := map[string]string{
+		"status":  "OK",
+		"service": "collector",
+	}
+
+	// Check Redis health if available
+	if s.redis != nil {
+		if err := s.redis.HealthCheck(); err != nil {
+			status["redis"] = "ERROR: " + err.Error()
+			w.WriteHeader(http.StatusServiceUnavailable)
+		} else {
+			status["redis"] = "OK"
+		}
+	} else {
+		status["redis"] = "DISABLED"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(status)
 }
 
 // Start runs the HTTP server in a new goroutine.

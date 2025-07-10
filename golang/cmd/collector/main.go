@@ -48,7 +48,17 @@ func main() {
 		cancel()
 	}()
 
-	dbStorage, err := storage.NewDBStorage(ctx, cfg, logger)
+	// Initialize Redis client
+	redisClient, err := storage.NewRedisClient(ctx, cfg, logger)
+	if err != nil {
+		logger.Fatal("Failed to create Redis client", zap.Error(err))
+	}
+	defer redisClient.Close()
+
+	// Set Redis client for health checks
+	metricsServer.SetRedisClient(redisClient)
+
+	dbStorage, err := storage.NewDBStorageWithRedis(ctx, cfg, logger, redisClient)
 	if err != nil {
 		logger.Fatal("Failed to create database storage", zap.Error(err))
 	}

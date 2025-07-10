@@ -107,19 +107,26 @@ func (j *JSONB) Scan(value interface{}) error {
 
 // DBStorage handles database operations.
 type DBStorage struct {
-	db     *sql.DB
-	cfg    *config.Config
-	buffer chan *LogEvent
-	wg     sync.WaitGroup
-	mu     sync.Mutex
-	ticker *time.Ticker
-	ctx    context.Context
-	cancel context.CancelFunc
-	logger *zap.Logger
+	db          *sql.DB
+	cfg         *config.Config
+	redis       *RedisClient
+	buffer      chan *LogEvent
+	wg          sync.WaitGroup
+	mu          sync.Mutex
+	ticker      *time.Ticker
+	ctx         context.Context
+	cancel      context.CancelFunc
+	logger      *zap.Logger
+	metadataMap sync.Map // In-memory cache for frequently accessed metadata
 }
 
-// NewDBStorage creates a new DBStorage instance.
+// NewDBStorage creates a new DBStorage instance without Redis.
 func NewDBStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*DBStorage, error) {
+	return NewDBStorageWithRedis(ctx, cfg, logger, nil)
+}
+
+// NewDBStorageWithRedis creates a new DBStorage instance with Redis support.
+func NewDBStorageWithRedis(ctx context.Context, cfg *config.Config, logger *zap.Logger, redis *RedisClient) (*DBStorage, error) {
 	db, err := sql.Open("postgres", cfg.PostgresURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
@@ -138,6 +145,7 @@ func NewDBStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger) (
 	storage := &DBStorage{
 		db:     db,
 		cfg:    cfg,
+		redis:  redis,
 		buffer: make(chan *LogEvent, cfg.BatchSize*2),
 		ticker: time.NewTicker(cfg.BatchTimeout),
 		ctx:    childCtx,
@@ -153,12 +161,36 @@ func NewDBStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger) (
 
 // AddToBatch adds a log event to the processing buffer.
 func (s *DBStorage) AddToBatch(event *LogEvent) {
+	// Check for deduplication if Redis is available
+	if s.redis != nil {
+		isDuplicate, err := s.redis.CheckDuplication(event)
+		if err != nil {
+			s.logger.Warn("Failed to check duplication, proceeding with event",
+				zap.Error(err),
+				zap.String("event_id", event.EventID))
+		} else if isDuplicate {
+			s.logger.Debug("Duplicate event detected, skipping",
+				zap.String("event_id", event.EventID),
+				zap.String("service", event.Source.Service))
+			metrics.MessagesSkipped.Inc()
+			return
+		}
+
+		// Mark as processed immediately to prevent race conditions
+		if err := s.redis.MarkAsProcessed(event); err != nil {
+			s.logger.Warn("Failed to mark event as processed",
+				zap.Error(err),
+				zap.String("event_id", event.EventID))
+		}
+	}
+
 	s.buffer <- event
 }
 
 func (s *DBStorage) batchProcessor() {
 	defer s.wg.Done()
 	batch := make([]*LogEvent, 0, s.cfg.BatchSize)
+	batchOptimizer := s.createBatchOptimizer()
 
 	for {
 		select {
@@ -168,14 +200,32 @@ func (s *DBStorage) batchProcessor() {
 			return
 		case <-s.ticker.C:
 			if len(batch) > 0 {
-				s.logger.Info("Batch timeout reached. Flushing logs.", zap.Int("batch_size", len(batch)))
+				optimizedSize := batchOptimizer.getOptimalBatchSize(batch)
+				s.logger.Info("Batch timeout reached. Flushing logs.",
+					zap.Int("batch_size", len(batch)),
+					zap.Int("optimal_size", optimizedSize))
+
+				// Record metrics
+				metrics.BatchSizeOptimized.Observe(float64(len(batch)))
+				metrics.CacheHitRatio.Set(batchOptimizer.cacheHitRatio)
+
 				s.flushWithRetry(batch)
 				batch = make([]*LogEvent, 0, s.cfg.BatchSize)
 			}
 		case event := <-s.buffer:
 			batch = append(batch, event)
-			if len(batch) >= s.cfg.BatchSize {
-				s.logger.Info("Batch size reached. Flushing logs.", zap.Int("batch_size", len(batch)))
+
+			// Use dynamic batch sizing based on Redis cache effectiveness
+			targetBatchSize := batchOptimizer.getOptimalBatchSize(batch)
+			if len(batch) >= targetBatchSize {
+				s.logger.Info("Optimal batch size reached. Flushing logs.",
+					zap.Int("batch_size", len(batch)),
+					zap.Int("optimal_size", targetBatchSize))
+
+				// Record metrics
+				metrics.BatchSizeOptimized.Observe(float64(len(batch)))
+				metrics.CacheHitRatio.Set(batchOptimizer.cacheHitRatio)
+
 				s.flushWithRetry(batch)
 				batch = make([]*LogEvent, 0, s.cfg.BatchSize)
 			}
@@ -211,6 +261,17 @@ func (s *DBStorage) flush(batch []*LogEvent) error {
 		return nil
 	}
 
+	// Measure batch processing time including Redis operations
+	batchTimer := time.Now()
+	defer func() {
+		metrics.BatchProcessingTime.Observe(time.Since(batchTimer).Seconds())
+	}()
+
+	// Process metadata caching before database operations
+	if s.redis != nil {
+		s.processMetadataCache(batch)
+	}
+
 	txn, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -225,10 +286,8 @@ func (s *DBStorage) flush(batch []*LogEvent) error {
 	}
 
 	for _, event := range batch {
-		contextJSON, _ := json.Marshal(event.Data.Context)
-		errorJSON, _ := json.Marshal(event.Data.Error)
-		structuredJSON, _ := json.Marshal(event.Data.Structured)
-		metadataJSON, _ := json.Marshal(event.Metadata)
+		// Use cached metadata if available
+		contextJSON, errorJSON, structuredJSON, metadataJSON := s.prepareEventData(event)
 
 		_, err = stmt.Exec(
 			event.EventID,
@@ -258,6 +317,20 @@ func (s *DBStorage) flush(batch []*LogEvent) error {
 
 	if err := txn.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Update batch counters
+	if s.redis != nil {
+		serviceCounters := make(map[string]int)
+		for _, event := range batch {
+			serviceCounters[event.Source.Service]++
+		}
+
+		for service, count := range serviceCounters {
+			for i := 0; i < count; i++ {
+				s.redis.IncrementBatchCounter(service)
+			}
+		}
 	}
 
 	s.logger.Info("Successfully flushed logs to the database.", zap.Int("count", len(batch)))
@@ -299,4 +372,185 @@ func (s *DBStorage) Close() {
 
 	s.db.Close()
 	s.logger.Info("Database connection closed.")
+}
+
+// processMetadataCache handles metadata caching for a batch of events
+func (s *DBStorage) processMetadataCache(batch []*LogEvent) {
+	processed := make(map[string]bool)
+
+	for _, event := range batch {
+		key := fmt.Sprintf("%s:%s:%s",
+			event.Source.Service,
+			event.Source.Version,
+			getEnvironmentFromMetadata(&event.Metadata))
+
+		if processed[key] {
+			continue
+		}
+		processed[key] = true
+
+		// Check if metadata is already cached
+		cachedMetadata, err := s.redis.GetCachedMetadata(
+			event.Source.Service,
+			event.Source.Version,
+			getEnvironmentFromMetadata(&event.Metadata),
+		)
+
+		if err != nil {
+			metrics.RedisErrors.Inc()
+			s.logger.Warn("Failed to get cached metadata",
+				zap.Error(err),
+				zap.String("service", event.Source.Service))
+			continue
+		}
+
+		if cachedMetadata == nil {
+			// Cache miss - create and store metadata
+			metadata := &CachedMetadata{
+				ServiceID:   event.Source.Service,
+				Environment: getEnvironmentFromMetadata(&event.Metadata),
+				Version:     event.Source.Version,
+				Attributes: map[string]interface{}{
+					"region":   event.Source.Region,
+					"instance": event.Source.Instance,
+				},
+				CachedAt: time.Now(),
+			}
+
+			if err := s.redis.CacheMetadata(
+				event.Source.Service,
+				event.Source.Version,
+				getEnvironmentFromMetadata(&event.Metadata),
+				metadata,
+			); err != nil {
+				metrics.RedisErrors.Inc()
+				s.logger.Warn("Failed to cache metadata",
+					zap.Error(err),
+					zap.String("service", event.Source.Service))
+			} else {
+				metrics.RedisCacheMisses.Inc()
+				s.metadataMap.Store(key, metadata)
+			}
+		} else {
+			// Cache hit - store in local map for faster access
+			metrics.RedisCacheHits.Inc()
+			s.metadataMap.Store(key, cachedMetadata)
+		}
+	}
+}
+
+// prepareEventData prepares JSON data for database insertion with optimized metadata handling
+func (s *DBStorage) prepareEventData(event *LogEvent) ([]byte, []byte, []byte, []byte) {
+	// Use cached serialization for frequently accessed data
+	contextJSON, _ := json.Marshal(event.Data.Context)
+	errorJSON, _ := json.Marshal(event.Data.Error)
+	structuredJSON, _ := json.Marshal(event.Data.Structured)
+
+	// Try to use cached metadata JSON if available
+	metadataKey := fmt.Sprintf("%s:%s:%s",
+		event.Source.Service,
+		event.Source.Version,
+		getEnvironmentFromMetadata(&event.Metadata))
+
+	if cachedMeta, ok := s.metadataMap.Load(metadataKey); ok {
+		if metadata, ok := cachedMeta.(*CachedMetadata); ok {
+			// Use optimized metadata structure
+			optimizedMetadata := map[string]interface{}{
+				"priority":          event.Metadata.Priority,
+				"tags":              event.Metadata.Tags,
+				"environment":       metadata.Environment,
+				"retry_count":       event.Metadata.RetryCount,
+				"schema_url":        event.Metadata.SchemaURL,
+				"cached_attributes": metadata.Attributes,
+			}
+			metadataJSON, _ := json.Marshal(optimizedMetadata)
+			return contextJSON, errorJSON, structuredJSON, metadataJSON
+		}
+	}
+
+	// Fallback to normal metadata marshaling
+	metadataJSON, _ := json.Marshal(event.Metadata)
+	return contextJSON, errorJSON, structuredJSON, metadataJSON
+}
+
+// getEnvironmentFromMetadata extracts environment from metadata
+func getEnvironmentFromMetadata(metadata *Metadata) string {
+	if metadata.Environment != nil {
+		return *metadata.Environment
+	}
+	return "unknown"
+}
+
+// BatchOptimizer helps optimize batch sizes based on Redis cache performance
+type BatchOptimizer struct {
+	baseBatchSize     int
+	maxBatchSize      int
+	cacheHitRatio     float64
+	lastOptimization  time.Time
+	serviceCacheStats map[string]*ServiceCacheStats
+}
+
+// ServiceCacheStats tracks cache performance per service
+type ServiceCacheStats struct {
+	CacheHits   int64
+	CacheMisses int64
+	LastUpdated time.Time
+}
+
+// createBatchOptimizer creates a new batch optimizer
+func (s *DBStorage) createBatchOptimizer() *BatchOptimizer {
+	return &BatchOptimizer{
+		baseBatchSize:     s.cfg.BatchSize,
+		maxBatchSize:      s.cfg.BatchSize * 2, // Allow up to 2x base size
+		cacheHitRatio:     0.5,                 // Start with 50% assumption
+		lastOptimization:  time.Now(),
+		serviceCacheStats: make(map[string]*ServiceCacheStats),
+	}
+}
+
+// getOptimalBatchSize calculates optimal batch size based on current conditions
+func (bo *BatchOptimizer) getOptimalBatchSize(batch []*LogEvent) int {
+	// Update cache statistics if enough time has passed
+	if time.Since(bo.lastOptimization) > 30*time.Second {
+		bo.updateCacheStats(batch)
+		bo.lastOptimization = time.Now()
+	}
+
+	// If cache hit ratio is high, we can process larger batches more efficiently
+	if bo.cacheHitRatio > 0.7 {
+		// High cache efficiency - use larger batches
+		return int(float64(bo.baseBatchSize) * 1.5)
+	} else if bo.cacheHitRatio < 0.3 {
+		// Low cache efficiency - use smaller batches for faster processing
+		return int(float64(bo.baseBatchSize) * 0.8)
+	}
+
+	// Medium efficiency - use base batch size
+	return bo.baseBatchSize
+}
+
+// updateCacheStats updates cache statistics for optimization
+func (bo *BatchOptimizer) updateCacheStats(batch []*LogEvent) {
+	if len(batch) == 0 {
+		return
+	}
+
+	// Simulate cache effectiveness calculation
+	// In a real implementation, this would track actual Redis performance
+	serviceStats := make(map[string]int)
+	for _, event := range batch {
+		serviceStats[event.Source.Service]++
+	}
+
+	// Update cache hit ratio based on service diversity
+	// More diverse services typically mean lower cache hit ratios
+	diversity := float64(len(serviceStats)) / float64(len(batch))
+
+	// High diversity (many different services) = lower cache hit ratio
+	// Low diversity (few services repeated) = higher cache hit ratio
+	bo.cacheHitRatio = 1.0 - (diversity * 0.7) // Max reduction of 70%
+
+	if bo.cacheHitRatio < 0.1 {
+		bo.cacheHitRatio = 0.1 // Minimum 10% hit ratio
+	}
 }

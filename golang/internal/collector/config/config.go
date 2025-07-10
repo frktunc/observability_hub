@@ -21,6 +21,14 @@ type Config struct {
 	HealthCheckPort string
 	RetryMax        int
 	RetryInterval   time.Duration
+	// Redis Configuration
+	RedisURL        string
+	RedisPassword   string
+	RedisDB         int
+	RedisPoolSize   int
+	RedisMinIdle    int
+	RedisMaxRetries int
+	RedisTTL        time.Duration
 }
 
 // Load reads configuration from environment variables and returns a new Config struct.
@@ -50,6 +58,31 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	redisDB, err := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	if err != nil {
+		return nil, err
+	}
+
+	redisPoolSize, err := strconv.Atoi(getEnv("REDIS_POOL_SIZE", "10"))
+	if err != nil {
+		return nil, err
+	}
+
+	redisMinIdle, err := strconv.Atoi(getEnv("REDIS_MIN_IDLE", "5"))
+	if err != nil {
+		return nil, err
+	}
+
+	redisMaxRetries, err := strconv.Atoi(getEnv("REDIS_MAX_RETRIES", "3"))
+	if err != nil {
+		return nil, err
+	}
+
+	redisTTL, err := time.ParseDuration(getEnv("REDIS_TTL", "1h"))
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://obs_user:obs_password@obs_rabbitmq:5672/"),
 		PostgresURL:     getEnv("POSTGRES_URL", "postgres://user:password@localhost:5432/logs?sslmode=disable"),
@@ -63,6 +96,14 @@ func Load() (*Config, error) {
 		RetryMax:        retryMax,
 		BatchTimeout:    batchTimeout,
 		RetryInterval:   retryInterval,
+		// Redis Configuration
+		RedisURL:        getEnv("REDIS_URL", "redis://obs_redis:6379"),
+		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
+		RedisDB:         redisDB,
+		RedisPoolSize:   redisPoolSize,
+		RedisMinIdle:    redisMinIdle,
+		RedisMaxRetries: redisMaxRetries,
+		RedisTTL:        redisTTL,
 	}
 	return cfg, nil
 }
