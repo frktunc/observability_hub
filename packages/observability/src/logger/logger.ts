@@ -206,15 +206,33 @@ export class ObservabilityLogger {
 
     try {
       const routingKey = options.routingKey || this.getRoutingKeyForLogLevel(message.level);
+      const eventId = uuidv4();
+      const timestamp = new Date().toISOString();
       
+      // Create JSON Schema compliant log event
       const enrichedMessage = {
-        ...message,
+        eventId,
+        eventType: `log.${message.level.toLowerCase()}.created`,
+        version: "1.0.0",
+        timestamp,
         correlationId: message.correlationId || options.correlationId || uuidv4(),
-        timestamp: new Date().toISOString(),
         source: {
           service: this.config.serviceName,
           version: this.config.serviceVersion,
-          host: process.env.HOSTNAME || 'unknown',
+          instance: process.env.HOSTNAME || 'unknown',
+          region: process.env.REGION || undefined,
+        },
+        data: {
+          level: message.level,
+          message: message.message,
+          timestamp,
+          context: message.context || undefined,
+          structured: message.metadata ? { fields: message.metadata } : undefined,
+          error: message.error || undefined,
+        },
+        metadata: {
+          priority: message.level === 'ERROR' || message.level === 'FATAL' ? 'high' : 'normal',
+          tags: [],
           environment: this.config.environment,
         },
       };
