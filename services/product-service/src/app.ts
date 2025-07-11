@@ -3,20 +3,20 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 
-import { ObservabilityLogger } from '@observability-hub/observability';
+import { ObservabilityLogger } from '@observability-hub/log-client';
 import { config, derivedConfig } from './config';
-// Import shared middleware from unified package
+// Import shared middleware (NO MORE COPY-PASTE!)
 import { 
   defaultCorrelationIdMiddleware,
   defaultErrorHandler,
   requestLoggingMiddleware,
   defaultMetrics
-} from '@observability-hub/observability/dist/middleware';
+} from '@observability-hub/shared-middleware';
 import { createRateLimitMiddleware } from './middleware/rate-limiting';
 import { initializeRedis } from './services/redis-client';
-import healthRoutes from './routes/health';
-import productsRoutes from './routes/products';
-import metricsRoutes from './routes/metrics';
+import { healthRoutes } from './routes/health';
+import { userRoutes } from './routes/users';
+import { metricsRoutes } from './routes/metrics';
 
 // Initialize observability logger
 const logger = new ObservabilityLogger({
@@ -121,7 +121,7 @@ export function createApp(): express.Application {
   }
 
   // API routes
-  app.use('/api/v1/products', productsRoutes);
+  app.use('/api/v1/users', userRoutes);
 
   // Welcome endpoint
   app.get('/', (req, res) => {
@@ -134,7 +134,7 @@ export function createApp(): express.Application {
       endpoints: {
         health: '/health',
         metrics: '/metrics',
-        products: '/api/v1/products',
+        users: '/api/v1/users',
         documentation: '/api/v1/docs',
       },
     });
@@ -145,9 +145,9 @@ export function createApp(): express.Application {
     res.json({
       openapi: '3.0.0',
       info: {
-        title: 'Product Service API',
+        title: 'User Service API',
         version: config.SERVICE_VERSION,
-        description: 'Product management microservice with observability logging',
+        description: 'User management microservice with observability logging',
       },
       servers: [
         {
@@ -176,17 +176,17 @@ export function createApp(): express.Application {
             },
           },
         },
-        '/api/v1/products': {
+        '/api/v1/users': {
           get: {
-            summary: 'List all products',
+            summary: 'List all users',
             responses: {
               '200': {
-                description: 'List of products',
+                description: 'List of users',
               },
             },
           },
           post: {
-            summary: 'Create a new product',
+            summary: 'Create a new user',
             requestBody: {
               required: true,
               content: {

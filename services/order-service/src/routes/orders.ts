@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { ObservabilityLogger } from '@observability-hub/observability';
+import { ObservabilityLogger } from '@observability-hub/log-client';
 import { Order, CreateOrderRequest, UpdateOrderRequest, OrderFilters, OrderStatus } from '../types/order';
 import { config, derivedConfig } from '../config';
 import { db } from '../services/database';

@@ -1,25 +1,76 @@
-import { createApp, initializeServices } from './app';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
 import { config, derivedConfig, validateConfiguration } from './config';
-import { ObservabilityLogger } from '@observability-hub/observability';
+import { v4 as uuidv4 } from 'uuid';
 import { db } from './services/database';
-import { closeRedis } from './services/redis-client';
 
-// Initialize observability logger
-const logger = new ObservabilityLogger({
-  serviceName: config.SERVICE_NAME,
-  serviceVersion: config.SERVICE_VERSION,
-  environment: config.NODE_ENV,
-  rabbitmqUrl: derivedConfig.rabbitmq.url,
-  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
-  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
-  defaultLogLevel: config.LOG_LEVEL as any,
-});
+// Import routes
+import healthRoutes from './routes/health';
+import metricsRoutes from './routes/metrics';
+import productsRoutes from './routes/products';
 
-// Validate configuration on startup
+// Import shared middleware (NO MORE COPY-PASTE!)
+import { 
+  defaultCorrelationIdMiddleware,
+  defaultErrorHandler,
+  requestLoggingMiddleware,
+  defaultMetrics
+} from '@observability-hub/shared-middleware';
+
+// Simple console logger (replace with proper observability logger if needed)
+const logger = {
+  info: (message: string, metadata?: any) => console.log(`[INFO] ${message}`, metadata || ''),
+  warn: (message: string, metadata?: any) => console.warn(`[WARN] ${message}`, metadata || ''),
+  error: (message: string, metadata?: any) => console.error(`[ERROR] ${message}`, metadata || ''),
+  debug: (message: string, metadata?: any) => console.debug(`[DEBUG] ${message}`, metadata || '')
+};
+
+// Initialize Express app
+const app = express();
+
+// Validate configuration
 validateConfiguration();
 
-// Create Express app using factory function
-const app = createApp();
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
+app.use(defaultCorrelationIdMiddleware);
+app.use(requestLoggingMiddleware({
+  customLogger: (level, message, metadata) => {
+    logger[level](message, metadata);
+  }
+}));
+app.use(defaultMetrics);
+
+// Routes
+app.use('/health', healthRoutes);
+app.use('/metrics', metricsRoutes);
+app.use('/api/v1/products', productsRoutes);
+
+// Error handling (using shared middleware - NO MORE COPY-PASTE!)
+app.use(defaultErrorHandler);
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    service: config.SERVICE_NAME,
+    version: config.SERVICE_VERSION,
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: `${derivedConfig.httpUrl}/health`,
+      metrics: `${derivedConfig.httpUrl}/metrics`,
+      products: `${derivedConfig.httpUrl}/api/v1/products`,
+    }
+  });
+});
 
 // Start server
 async function startServer() {
@@ -29,18 +80,12 @@ async function startServer() {
     await db.connect();
     console.log('✅ Database connected and schema initialized');
 
-    // Initialize observability services (Redis, etc.)
-    console.log('🔗 Initializing observability services...');
-    await initializeServices();
-    console.log('✅ Observability services initialized');
-
     const server = app.listen(config.PORT, config.HOST, () => {
       logger.info(`🚀 Product Service is running on port ${config.PORT}`);
       logger.info(`📊 Health check: ${derivedConfig.httpUrl}/health`);
       logger.info(`📈 Metrics: ${derivedConfig.httpUrl}/metrics`);
       logger.info(`📦 Products API: ${derivedConfig.httpUrl}/api/v1/products`);
       logger.info(`💾 Database: Connected and ready`);
-      logger.info(`🎯 Redis: Connected for rate limiting`);
     });
 
     return server;
@@ -70,11 +115,8 @@ process.on('SIGTERM', async () => {
       try {
         await db.disconnect();
         logger.info('✅ Database disconnected');
-        
-        await closeRedis();
-        logger.info('✅ Redis disconnected');
       } catch (error) {
-        logger.error('Error during shutdown:', error instanceof Error ? error : new Error(String(error)));
+        logger.error('Error disconnecting database:', error instanceof Error ? error : new Error(String(error)));
       }
       logger.info('✅ Server closed');
       process.exit(0);
@@ -91,11 +133,8 @@ process.on('SIGINT', async () => {
       try {
         await db.disconnect();
         logger.info('✅ Database disconnected');
-        
-        await closeRedis();
-        logger.info('✅ Redis disconnected');
       } catch (error) {
-        logger.error('Error during shutdown:', error instanceof Error ? error : new Error(String(error)));
+        logger.error('Error disconnecting database:', error instanceof Error ? error : new Error(String(error)));
       }
       logger.info('✅ Server closed');
       process.exit(0);

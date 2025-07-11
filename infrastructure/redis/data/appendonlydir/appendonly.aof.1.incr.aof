@@ -2394,3 +2394,8 @@ $1
 *1
 $4
 EXEC
+*2
+$3
+DEL
+$79
+rl:product-service::default:192.168.65.1:/api/v1/products:PostmanRuntime/7.44.1
