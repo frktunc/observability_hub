@@ -3,20 +3,19 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 
-import { ObservabilityLogger } from '@observability-hub/log-client';
 import { config, derivedConfig } from './config';
-// Import shared middleware (NO MORE COPY-PASTE!)
-import { 
-  defaultCorrelationIdMiddleware,
-  defaultErrorHandler,
+import { ObservabilityLogger } from '@observability-hub/observability';
+import {
+  correlationIdMiddleware,
+  errorHandlerMiddleware,
   requestLoggingMiddleware,
-  defaultMetrics
-} from '@observability-hub/shared-middleware';
+  metricsMiddleware,
+} from '@observability-hub/observability/middleware';
 import { createRateLimitMiddleware } from './middleware/rate-limiting';
 import { initializeRedis } from './services/redis-client';
-import { healthRoutes } from './routes/health';
-import { userRoutes } from './routes/users';
-import { metricsRoutes } from './routes/metrics';
+import healthRoutes from './routes/health';
+import productRoutes from './routes/products';
+import metricsRoutes from './routes/metrics';
 
 // Initialize observability logger
 const logger = new ObservabilityLogger({
@@ -100,16 +99,26 @@ export function createApp(): express.Application {
     app.use(rateLimitMiddleware);
   }
 
-  // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
-  app.use(defaultCorrelationIdMiddleware);
-  app.use(requestLoggingMiddleware({
-    customLogger: (level, message, metadata) => {
-      console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
-    }
+  // Custom middleware
+  app.use(correlationIdMiddleware());
+  app.use(requestLoggingMiddleware({ 
+    customLogger: (level, message, meta) => {
+      switch (level) {
+        case 'warn':
+          logger.warn(message, meta);
+          break;
+        case 'error':
+          logger.error(message, new Error(message), meta);
+          break;
+        default:
+          logger.info(message, meta);
+          break;
+      }
+    } 
   }));
   
   if (config.METRICS_ENABLED) {
-    app.use(defaultMetrics);
+    app.use(metricsMiddleware);
   }
 
   // Health check endpoint (before authentication)
@@ -121,7 +130,7 @@ export function createApp(): express.Application {
   }
 
   // API routes
-  app.use('/api/v1/users', userRoutes);
+  app.use('/api/v1/products', productRoutes);
 
   // Welcome endpoint
   app.get('/', (req, res) => {
@@ -134,7 +143,7 @@ export function createApp(): express.Application {
       endpoints: {
         health: '/health',
         metrics: '/metrics',
-        users: '/api/v1/users',
+        products: '/api/v1/products',
         documentation: '/api/v1/docs',
       },
     });
@@ -176,38 +185,32 @@ export function createApp(): express.Application {
             },
           },
         },
-        '/api/v1/users': {
+        '/api/v1/products': {
           get: {
-            summary: 'List all users',
+            summary: 'List all products',
             responses: {
               '200': {
-                description: 'List of users',
+                description: 'List of products',
               },
             },
           },
           post: {
-            summary: 'Create a new user',
+            summary: 'Create a new product',
             requestBody: {
               required: true,
               content: {
                 'application/json': {
                   schema: {
                     type: 'object',
-                    required: ['name', 'email'],
+                    required: ['name', 'price'],
                     properties: {
                       name: {
                         type: 'string',
-                        description: 'User full name',
+                        description: 'Product name',
                       },
-                      email: {
-                        type: 'string',
-                        format: 'email',
-                        description: 'User email address',
-                      },
-                      role: {
-                        type: 'string',
-                        enum: ['user', 'admin', 'moderator'],
-                        default: 'user',
+                      price: {
+                        type: 'number',
+                        description: 'Product price',
                       },
                     },
                   },
@@ -216,7 +219,7 @@ export function createApp(): express.Application {
             },
             responses: {
               '201': {
-                description: 'User created successfully',
+                description: 'Product created successfully',
               },
               '400': {
                 description: 'Invalid input data',
@@ -224,9 +227,9 @@ export function createApp(): express.Application {
             },
           },
         },
-        '/api/v1/users/{id}': {
+        '/api/v1/products/{id}': {
           get: {
-            summary: 'Get user by ID',
+            summary: 'Get product by ID',
             parameters: [
               {
                 name: 'id',
@@ -239,15 +242,15 @@ export function createApp(): express.Application {
             ],
             responses: {
               '200': {
-                description: 'User details',
+                description: 'Product details',
               },
               '404': {
-                description: 'User not found',
+                description: 'Product not found',
               },
             },
           },
           put: {
-            summary: 'Update user',
+            summary: 'Update product',
             parameters: [
               {
                 name: 'id',
@@ -268,13 +271,8 @@ export function createApp(): express.Application {
                       name: {
                         type: 'string',
                       },
-                      email: {
-                        type: 'string',
-                        format: 'email',
-                      },
-                      role: {
-                        type: 'string',
-                        enum: ['user', 'admin', 'moderator'],
+                      price: {
+                        type: 'number',
                       },
                     },
                   },
@@ -283,15 +281,15 @@ export function createApp(): express.Application {
             },
             responses: {
               '200': {
-                description: 'User updated successfully',
+                description: 'Product updated successfully',
               },
               '404': {
-                description: 'User not found',
+                description: 'Product not found',
               },
             },
           },
           delete: {
-            summary: 'Delete user',
+            summary: 'Delete product',
             parameters: [
               {
                 name: 'id',
@@ -304,10 +302,10 @@ export function createApp(): express.Application {
             ],
             responses: {
               '204': {
-                description: 'User deleted successfully',
+                description: 'Product deleted successfully',
               },
               '404': {
-                description: 'User not found',
+                description: 'Product not found',
               },
             },
           },
@@ -316,8 +314,8 @@ export function createApp(): express.Application {
     });
   });
 
-  // Error handling middleware (must be last) - using shared middleware
-  app.use(defaultErrorHandler);
+  // Error handling middleware (must be last)
+  app.use(errorHandlerMiddleware({ customLogger: (err, req) => logger.error(err.message, err, { request: { httpMethod: req.method, path: req.path, correlationId: req.correlationId } }) }));
 
   return app;
 }
@@ -333,4 +331,4 @@ declare global {
       rawBody?: Buffer;
     }
   }
-} 
+}

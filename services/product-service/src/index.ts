@@ -11,21 +11,17 @@ import healthRoutes from './routes/health';
 import metricsRoutes from './routes/metrics';
 import productsRoutes from './routes/products';
 
-// Import shared middleware (NO MORE COPY-PASTE!)
-import { 
-  defaultCorrelationIdMiddleware,
-  defaultErrorHandler,
+import { ObservabilityLogger } from '@observability-hub/observability';
+import {
+  correlationIdMiddleware,
+  errorHandlerMiddleware,
   requestLoggingMiddleware,
-  defaultMetrics
-} from '@observability-hub/shared-middleware';
+  metricsMiddleware,
+} from '@observability-hub/observability/middleware';
 
-// Simple console logger (replace with proper observability logger if needed)
-const logger = {
-  info: (message: string, metadata?: any) => console.log(`[INFO] ${message}`, metadata || ''),
-  warn: (message: string, metadata?: any) => console.warn(`[WARN] ${message}`, metadata || ''),
-  error: (message: string, metadata?: any) => console.error(`[ERROR] ${message}`, metadata || ''),
-  debug: (message: string, metadata?: any) => console.debug(`[DEBUG] ${message}`, metadata || '')
-};
+const logger = new ObservabilityLogger({
+  serviceName: config.SERVICE_NAME,
+});
 
 // Initialize Express app
 const app = express();
@@ -40,22 +36,32 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
-app.use(defaultCorrelationIdMiddleware);
-app.use(requestLoggingMiddleware({
-  customLogger: (level, message, metadata) => {
-    logger[level](message, metadata);
-  }
+// Custom middleware
+app.use(correlationIdMiddleware());
+app.use(requestLoggingMiddleware({ 
+  customLogger: (level, message, meta) => {
+    switch (level) {
+      case 'warn':
+        logger.warn(message, meta);
+        break;
+      case 'error':
+        logger.error(message, new Error(message), meta);
+        break;
+      default:
+        logger.info(message, meta);
+        break;
+    }
+  } 
 }));
-app.use(defaultMetrics);
+app.use(metricsMiddleware);
 
 // Routes
 app.use('/health', healthRoutes);
 app.use('/metrics', metricsRoutes);
 app.use('/api/v1/products', productsRoutes);
 
-// Error handling (using shared middleware - NO MORE COPY-PASTE!)
-app.use(defaultErrorHandler);
+// Error handling
+app.use(errorHandlerMiddleware({ customLogger: (err, req) => logger.error(err.message, err, { request: { httpMethod: req.method, path: req.path, correlationId: req.correlationId } }) }));
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -144,4 +150,4 @@ process.on('SIGINT', async () => {
   }
 });
 
-export default app; 
+export default app;
