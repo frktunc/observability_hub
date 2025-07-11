@@ -1,0 +1,14 @@
+"use strict";
+// Types for @observability-hub/log-client library
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.LogLevel = void 0;
+var LogLevel;
+(function (LogLevel) {
+    LogLevel["TRACE"] = "TRACE";
+    LogLevel["DEBUG"] = "DEBUG";
+    LogLevel["INFO"] = "INFO";
+    LogLevel["WARN"] = "WARN";
+    LogLevel["ERROR"] = "ERROR";
+    LogLevel["FATAL"] = "FATAL";
+})(LogLevel || (exports.LogLevel = LogLevel = {}));
+//# sourceMappingURL=types.js.map

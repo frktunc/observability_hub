@@ -1,0 +1,41 @@
+import Redis from 'ioredis';
+export interface RedisConfig {
+    host: string;
+    port: number;
+    password?: string;
+    db: number;
+    connectionTimeout: number;
+    commandTimeout: number;
+    maxRetries: number;
+    retryDelay: number;
+}
+export declare class RedisClient {
+    private client;
+    private isConnected;
+    private serviceName;
+    constructor(config: RedisConfig, serviceName: string);
+    private setupEventHandlers;
+    connect(): Promise<void>;
+    disconnect(): Promise<void>;
+    getClient(): Redis;
+    isClientConnected(): boolean;
+    ping(): Promise<string>;
+    incrementCounter(key: string, ttl: number): Promise<number>;
+    getCounter(key: string): Promise<number>;
+    getTTL(key: string): Promise<number>;
+    setKeyWithTTL(key: string, value: string | number, ttlSeconds: number): Promise<void>;
+    deleteKey(key: string): Promise<number>;
+    getKeys(pattern: string): Promise<string[]>;
+    healthCheck(): Promise<{
+        status: string;
+        latency?: number;
+        error?: string;
+    }>;
+}
+export declare const createRedisClient: (config: RedisConfig, serviceName: string) => RedisClient;
+export declare const createRedisService: (config: RedisConfig, serviceName: string) => {
+    getRedisClient: () => RedisClient;
+    initializeRedis: () => Promise<RedisClient>;
+    closeRedis: () => Promise<void>;
+};
+//# sourceMappingURL=index.d.ts.map

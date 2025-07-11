@@ -3,13 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.userRoutes = void 0;
 const express_1 = require("express");
 const uuid_1 = require("uuid");
-const log_client_1 = require("@observability-hub/log-client");
+const observability_1 = require("@observability-hub/observability");
 const config_1 = require("../config");
 const user_repository_1 = require("../services/user-repository");
 const router = (0, express_1.Router)();
 exports.userRoutes = router;
 // Initialize logger
-const logger = new log_client_1.ObservabilityLogger({
+const logger = new observability_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
     environment: config_1.config.NODE_ENV,

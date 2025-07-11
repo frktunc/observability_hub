@@ -45,9 +45,19 @@ const configSchema = zod_1.z.object({
     HEALTH_CHECK_ENABLED: zod_1.z.coerce.boolean().default(true),
     HEALTH_CHECK_PATH: zod_1.z.string().default('/health'),
     HEALTH_CHECK_TIMEOUT: zod_1.z.coerce.number().default(5000),
+    REDIS_HOST: zod_1.z.string().default('obs_redis'),
+    REDIS_PORT: zod_1.z.coerce.number().default(6379),
+    REDIS_PASSWORD: zod_1.z.string().optional(),
+    REDIS_DB: zod_1.z.coerce.number().default(3),
+    REDIS_CONNECTION_TIMEOUT: zod_1.z.coerce.number().default(5000),
+    REDIS_COMMAND_TIMEOUT: zod_1.z.coerce.number().default(5000),
+    REDIS_MAX_RETRIES: zod_1.z.coerce.number().default(3),
+    REDIS_RETRY_DELAY: zod_1.z.coerce.number().default(1000),
     RATE_LIMIT_ENABLED: zod_1.z.coerce.boolean().default(true),
     RATE_LIMIT_WINDOW_MS: zod_1.z.coerce.number().default(60000),
-    RATE_LIMIT_MAX_REQUESTS: zod_1.z.coerce.number().default(1000),
+    RATE_LIMIT_MAX_REQUESTS: zod_1.z.coerce.number().default(150),
+    RATE_LIMIT_REDIS_ENABLED: zod_1.z.coerce.boolean().default(true),
+    RATE_LIMIT_REDIS_PREFIX: zod_1.z.string().default('rl:order-service:'),
     CIRCUIT_BREAKER_ENABLED: zod_1.z.coerce.boolean().default(true),
     CIRCUIT_BREAKER_TIMEOUT: zod_1.z.coerce.number().default(3000),
     CIRCUIT_BREAKER_ERROR_THRESHOLD: zod_1.z.coerce.number().min(0).max(100).default(50),
@@ -120,6 +130,26 @@ exports.derivedConfig = {
             retryDelayMs: exports.config.RABBITMQ_RETRY_DELAY,
         }
     },
+    redis: {
+        host: exports.config.REDIS_HOST,
+        port: exports.config.REDIS_PORT,
+        password: exports.config.REDIS_PASSWORD,
+        db: exports.config.REDIS_DB,
+        connectionTimeout: exports.config.REDIS_CONNECTION_TIMEOUT,
+        commandTimeout: exports.config.REDIS_COMMAND_TIMEOUT,
+        maxRetries: exports.config.REDIS_MAX_RETRIES,
+        retryDelay: exports.config.REDIS_RETRY_DELAY,
+        rateLimiting: {
+            enabled: exports.config.RATE_LIMIT_REDIS_ENABLED,
+            prefix: exports.config.RATE_LIMIT_REDIS_PREFIX,
+        }
+    },
+    circuitBreaker: {
+        enabled: exports.config.CIRCUIT_BREAKER_ENABLED,
+        timeout: exports.config.CIRCUIT_BREAKER_TIMEOUT,
+        errorThreshold: exports.config.CIRCUIT_BREAKER_ERROR_THRESHOLD,
+        resetTimeout: exports.config.CIRCUIT_BREAKER_RESET_TIMEOUT,
+    }
 };
 const validateConfiguration = () => {
     console.log('🔧 Configuration validated successfully');

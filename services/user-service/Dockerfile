@@ -1,35 +1,21 @@
-# Stage 1: Build shared-middleware
-FROM node:18-alpine AS shared-middleware-builder
-WORKDIR /shared-middleware
-COPY packages/shared-middleware/package.json packages/shared-middleware/package-lock.json ./
+# Stage 1: Build unified observability package
+FROM node:18-alpine AS observability-builder
+WORKDIR /observability
+COPY packages/observability/package.json packages/observability/package-lock.json ./
 RUN npm install
-COPY packages/shared-middleware ./
+COPY packages/observability ./
 RUN npm run build
 RUN npm pack
 
-# Stage 2: Build log-client
-FROM node:18-alpine AS log-client-builder
-WORKDIR /log-client
-COPY packages/log-client/package.json packages/log-client/package-lock.json ./
-RUN npm install
-COPY packages/log-client ./
-RUN npm run build
-RUN npm pack
-
-# Stage 3: Build user-service
+# Stage 2: Build user-service
 FROM node:18-alpine AS builder
 WORKDIR /workspace
 
-# Create the directory structure to match package.json relative paths
-# package.json expects: ../../packages/shared-middleware/...
-# So we need: workspace/services/user-service/ structure
-RUN mkdir -p services/user-service packages/shared-middleware
+# Create the directory structure for the service
+RUN mkdir -p services/user-service
 
-# Copy the packed shared-middleware to the expected location
-COPY --from=shared-middleware-builder /shared-middleware/observability-hub-shared-middleware-1.0.0.tgz ./packages/shared-middleware/
-
-# Copy the packed log-client to service directory
-COPY --from=log-client-builder /log-client/observability-hub-log-client-1.0.0.tgz ./services/user-service/
+# Copy the packed unified observability package to service directory
+COPY --from=observability-builder /observability/observability-hub-observability-1.0.0.tgz ./services/user-service/
 
 # Move to service directory for build
 WORKDIR /workspace/services/user-service
@@ -45,7 +31,7 @@ COPY services/user-service/tsconfig.json ./
 # Build the application
 RUN npm run build
 
-# Stage 4: Production
+# Stage 3: Production
 FROM node:18-alpine AS runner
 WORKDIR /app
 

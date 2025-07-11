@@ -1,23 +1,21 @@
-# Stage 1: Build shared-middleware
-FROM node:18-alpine AS shared-middleware-builder
-WORKDIR /shared-middleware
-COPY packages/shared-middleware/package.json packages/shared-middleware/package-lock.json ./
+# Stage 1: Build unified observability package
+FROM node:18-alpine AS observability-builder
+WORKDIR /observability
+COPY packages/observability/package.json packages/observability/package-lock.json ./
 RUN npm install
-COPY packages/shared-middleware ./
+COPY packages/observability ./
 RUN npm run build
 RUN npm pack
 
-# Stage 2: Build product-service (no log-client dependency)
+# Stage 2: Build product-service
 FROM node:18-alpine AS builder
 WORKDIR /workspace
 
-# Create the directory structure to match package.json relative paths
-# package.json expects: ../../packages/shared-middleware/...
-# So we need: workspace/services/product-service/ structure
-RUN mkdir -p services/product-service packages/shared-middleware
+# Create the directory structure for the service
+RUN mkdir -p services/product-service
 
-# Copy the packed shared-middleware to the expected location
-COPY --from=shared-middleware-builder /shared-middleware/observability-hub-shared-middleware-1.0.0.tgz ./packages/shared-middleware/
+# Copy the packed unified observability package to service directory
+COPY --from=observability-builder /observability/observability-hub-observability-1.0.0.tgz ./services/product-service/
 
 # Move to service directory for build
 WORKDIR /workspace/services/product-service

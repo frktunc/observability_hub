@@ -24,6 +24,13 @@ export declare const config: {
     RABBITMQ_HEARTBEAT: number;
     RABBITMQ_MAX_RETRIES: number;
     RABBITMQ_RETRY_DELAY: number;
+    REDIS_HOST: string;
+    REDIS_PORT: number;
+    REDIS_DB: number;
+    REDIS_CONNECTION_TIMEOUT: number;
+    REDIS_COMMAND_TIMEOUT: number;
+    REDIS_MAX_RETRIES: number;
+    REDIS_RETRY_DELAY: number;
     LOG_LEVEL: "error" | "warn" | "info" | "debug" | "trace";
     LOG_FORMAT: "json" | "pretty";
     LOG_MAX_FILE_SIZE: string;
@@ -38,6 +45,8 @@ export declare const config: {
     RATE_LIMIT_ENABLED: boolean;
     RATE_LIMIT_WINDOW_MS: number;
     RATE_LIMIT_MAX_REQUESTS: number;
+    RATE_LIMIT_REDIS_ENABLED: boolean;
+    RATE_LIMIT_REDIS_PREFIX: string;
     CIRCUIT_BREAKER_ENABLED: boolean;
     CIRCUIT_BREAKER_TIMEOUT: number;
     CIRCUIT_BREAKER_ERROR_THRESHOLD: number;
@@ -52,6 +61,7 @@ export declare const config: {
     FEATURE_COMPRESSION: boolean;
     FEATURE_CORRELATION_ID_GENERATION: boolean;
     SERVICE_INSTANCE_ID?: string | undefined;
+    REDIS_PASSWORD?: string | undefined;
 };
 export declare const derivedConfig: {
     isDevelopment: boolean;
@@ -73,6 +83,10 @@ export declare const derivedConfig: {
     };
     rabbitmq: {
         url: string;
+        hostname: string;
+        port: number;
+        user: string;
+        password: string;
         vhost: string;
         exchange: string;
         routingKeys: {
@@ -90,6 +104,26 @@ export declare const derivedConfig: {
             maxRetries: number;
             retryDelayMs: number;
         };
+    };
+    redis: {
+        host: string;
+        port: number;
+        password: string | undefined;
+        db: number;
+        connectionTimeout: number;
+        commandTimeout: number;
+        maxRetries: number;
+        retryDelay: number;
+        rateLimiting: {
+            enabled: boolean;
+            prefix: string;
+        };
+    };
+    circuitBreaker: {
+        enabled: boolean;
+        timeout: number;
+        errorThreshold: number;
+        resetTimeout: number;
     };
 };
 export declare const validateConfiguration: () => void;

@@ -2,11 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const app_1 = require("./app");
 const config_1 = require("./config");
-const log_client_1 = require("@observability-hub/log-client");
+const observability_1 = require("@observability-hub/observability");
 const database_1 = require("./services/database");
 const redis_client_1 = require("./services/redis-client");
 // Initialize observability logger
-const logger = new log_client_1.ObservabilityLogger({
+const logger = new observability_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
     environment: config_1.config.NODE_ENV,

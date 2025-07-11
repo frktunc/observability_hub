@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { config, derivedConfig, validateConfiguration } from './config';
-import { ObservabilityLogger } from '@observability-hub/log-client';
+import { ObservabilityLogger } from '@observability-hub/observability';
 import { db } from './services/database';
 
 // Import routes
@@ -11,13 +11,13 @@ import healthRoutes from './routes/health';
 import metricsRoutes from './routes/metrics';
 import ordersRoutes from './routes/orders';
 
-// Import shared middleware (NO MORE COPY-PASTE!)
+// Import shared middleware from unified package
 import { 
   defaultCorrelationIdMiddleware,
   defaultErrorHandler,
   requestLoggingMiddleware,
   defaultMetrics
-} from '@observability-hub/shared-middleware';
+} from '@observability-hub/observability/dist/middleware';
 
 // Initialize logger
 const logger = new ObservabilityLogger({
@@ -52,11 +52,11 @@ async function startServer() {
 
     // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
     app.use(defaultCorrelationIdMiddleware);
-    app.use(requestLoggingMiddleware({
-      customLogger: (level, message, metadata) => {
-        logger[level](message, metadata);
-      }
-    }));
+  app.use(requestLoggingMiddleware({
+  customLogger: (level, message, metadata) => {
+    console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');  // ← DOĞRU!
+  }
+}));
     app.use(defaultMetrics);
 
     // Routes

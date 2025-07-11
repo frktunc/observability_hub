@@ -1,11 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const log_client_1 = require("@observability-hub/log-client");
+const observability_1 = require("@observability-hub/observability");
 const config_1 = require("../config");
 const database_1 = require("../services/database");
 const router = (0, express_1.Router)();
-const logger = new log_client_1.ObservabilityLogger({
+const logger = new observability_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
     environment: config_1.config.NODE_ENV,

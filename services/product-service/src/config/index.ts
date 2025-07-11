@@ -28,8 +28,8 @@ const configSchema = z.object({
   DATABASE_TIMEOUT: z.coerce.number().default(5000),
   
   // RabbitMQ Configuration
-  RABBITMQ_URL: z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672'),
-  RABBITMQ_HOSTNAME: z.string().default('rabbitmq'),
+  RABBITMQ_URL: z.string().default('amqp://obs_user:obs_password@obs_rabbitmq:5672/'),
+  RABBITMQ_HOSTNAME: z.string().default('obs_rabbitmq'),
   RABBITMQ_PORT: z.coerce.number().default(5672),
   RABBITMQ_USER: z.string().default('obs_user'),
   RABBITMQ_PASSWORD: z.string().default('obs_password'),
@@ -40,7 +40,15 @@ const configSchema = z.object({
   RABBITMQ_MAX_RETRIES: z.coerce.number().default(5),
   RABBITMQ_RETRY_DELAY: z.coerce.number().default(2000),
   
-
+  // Redis Configuration (ADDED FOR OBSERVABILITY CONSISTENCY)
+  REDIS_HOST: z.string().default('obs_redis'),
+  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+  REDIS_DB: z.coerce.number().default(2), // Different DB: user-service=1, product-service=2
+  REDIS_CONNECTION_TIMEOUT: z.coerce.number().default(5000),
+  REDIS_COMMAND_TIMEOUT: z.coerce.number().default(5000),
+  REDIS_MAX_RETRIES: z.coerce.number().default(3),
+  REDIS_RETRY_DELAY: z.coerce.number().default(1000),
   
   // Logging Configuration
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -59,10 +67,12 @@ const configSchema = z.object({
   HEALTH_CHECK_PATH: z.string().default('/health'),
   HEALTH_CHECK_TIMEOUT: z.coerce.number().default(5000),
   
-  // Rate Limiting
+  // Rate Limiting (UPGRADED FOR REDIS SUPPORT)
   RATE_LIMIT_ENABLED: z.coerce.boolean().default(true),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000), // 1 minute
-  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(1000),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100), // Redis ile daha güçlü rate limiting
+  RATE_LIMIT_REDIS_ENABLED: z.coerce.boolean().default(true),
+  RATE_LIMIT_REDIS_PREFIX: z.string().default('rl:product-service:'),
   
   // Circuit Breaker
   CIRCUIT_BREAKER_ENABLED: z.coerce.boolean().default(true),
@@ -132,6 +142,10 @@ export const derivedConfig = {
   // RabbitMQ routing
   rabbitmq: {
     url: config.RABBITMQ_URL,
+    hostname: config.RABBITMQ_HOSTNAME,
+    port: config.RABBITMQ_PORT,
+    user: config.RABBITMQ_USER,
+    password: config.RABBITMQ_PASSWORD,
     vhost: config.RABBITMQ_VHOST,
     exchange: config.RABBITMQ_EXCHANGE,
     routingKeys: {
@@ -150,6 +164,30 @@ export const derivedConfig = {
       retryDelayMs: config.RABBITMQ_RETRY_DELAY,
     }
   },
+  
+  // Redis configuration (ADDED FOR OBSERVABILITY CONSISTENCY)
+  redis: {
+    host: config.REDIS_HOST,
+    port: config.REDIS_PORT,
+    password: config.REDIS_PASSWORD,
+    db: config.REDIS_DB,
+    connectionTimeout: config.REDIS_CONNECTION_TIMEOUT,
+    commandTimeout: config.REDIS_COMMAND_TIMEOUT,
+    maxRetries: config.REDIS_MAX_RETRIES,
+    retryDelay: config.REDIS_RETRY_DELAY,
+    rateLimiting: {
+      enabled: config.RATE_LIMIT_REDIS_ENABLED,
+      prefix: config.RATE_LIMIT_REDIS_PREFIX,
+    }
+  },
+  
+  // Circuit breaker configuration (ADDED FOR OBSERVABILITY CONSISTENCY)
+  circuitBreaker: {
+    enabled: config.CIRCUIT_BREAKER_ENABLED,
+    timeout: config.CIRCUIT_BREAKER_TIMEOUT,
+    errorThreshold: config.CIRCUIT_BREAKER_ERROR_THRESHOLD,
+    resetTimeout: config.CIRCUIT_BREAKER_RESET_TIMEOUT,
+  }
   
   
 };

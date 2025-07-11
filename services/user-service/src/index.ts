@@ -1,6 +1,6 @@
 import { createApp, initializeServices } from './app';
 import { config, derivedConfig } from './config';
-import { ObservabilityLogger } from '@observability-hub/log-client';
+import { ObservabilityLogger } from '@observability-hub/observability';
 import { db } from './services/database';
 import { closeRedis } from './services/redis-client';
 

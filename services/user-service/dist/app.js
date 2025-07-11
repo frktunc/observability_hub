@@ -9,17 +9,17 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const compression_1 = __importDefault(require("compression"));
-const log_client_1 = require("@observability-hub/log-client");
+const observability_1 = require("@observability-hub/observability");
 const config_1 = require("./config");
-// Import shared middleware (NO MORE COPY-PASTE!)
-const shared_middleware_1 = require("@observability-hub/shared-middleware");
+// Import shared middleware from unified package
+const middleware_1 = require("@observability-hub/observability/dist/middleware");
 const rate_limiting_1 = require("./middleware/rate-limiting");
 const redis_client_1 = require("./services/redis-client");
 const health_1 = require("./routes/health");
 const users_1 = require("./routes/users");
 const metrics_1 = require("./routes/metrics");
 // Initialize observability logger
-const logger = new log_client_1.ObservabilityLogger({
+const logger = new observability_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,
     environment: config_1.config.NODE_ENV,
@@ -93,14 +93,14 @@ function createApp() {
         app.use(rateLimitMiddleware);
     }
     // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
-    app.use(shared_middleware_1.defaultCorrelationIdMiddleware);
-    app.use((0, shared_middleware_1.requestLoggingMiddleware)({
+    app.use(middleware_1.defaultCorrelationIdMiddleware);
+    app.use((0, middleware_1.requestLoggingMiddleware)({
         customLogger: (level, message, metadata) => {
             console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
         }
     }));
     if (config_1.config.METRICS_ENABLED) {
-        app.use(shared_middleware_1.defaultMetrics);
+        app.use(middleware_1.defaultMetrics);
     }
     // Health check endpoint (before authentication)
     app.use('/health', health_1.healthRoutes);
@@ -302,7 +302,7 @@ function createApp() {
         });
     });
     // Error handling middleware (must be last) - using shared middleware
-    app.use(shared_middleware_1.defaultErrorHandler);
+    app.use(middleware_1.defaultErrorHandler);
     return app;
 }
 //# sourceMappingURL=app.js.map

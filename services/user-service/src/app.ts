@@ -3,15 +3,15 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 
-import { ObservabilityLogger } from '@observability-hub/log-client';
+import { ObservabilityLogger } from '@observability-hub/observability';
 import { config, derivedConfig } from './config';
-// Import shared middleware (NO MORE COPY-PASTE!)
+// Import shared middleware from unified package
 import { 
   defaultCorrelationIdMiddleware,
   defaultErrorHandler,
   requestLoggingMiddleware,
   defaultMetrics
-} from '@observability-hub/shared-middleware';
+} from '@observability-hub/observability/dist/middleware';
 import { createRateLimitMiddleware } from './middleware/rate-limiting';
 import { initializeRedis } from './services/redis-client';
 import { healthRoutes } from './routes/health';
