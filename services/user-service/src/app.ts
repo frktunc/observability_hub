@@ -11,7 +11,7 @@ import {
   defaultErrorHandler,
   requestLoggingMiddleware,
   defaultMetrics
-} from '@observability-hub/observability/dist/middleware';
+} from '@observability-hub/observability/middleware';
 import { createRateLimitMiddleware } from './middleware/rate-limiting';
 import { initializeRedis } from './services/redis-client';
 import { healthRoutes } from './routes/health';
@@ -103,7 +103,7 @@ export function createApp(): express.Application {
   // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
   app.use(defaultCorrelationIdMiddleware);
   app.use(requestLoggingMiddleware({
-    customLogger: (level, message, metadata) => {
+    customLogger: (level: string, message: string, metadata?: any) => {
       console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
     }
   }));

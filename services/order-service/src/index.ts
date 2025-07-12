@@ -17,7 +17,7 @@ import {
   defaultErrorHandler,
   requestLoggingMiddleware,
   defaultMetrics
-} from '@observability-hub/observability/dist/middleware';
+} from '@observability-hub/observability/middleware';
 
 // Initialize logger
 const logger = new ObservabilityLogger({
@@ -53,7 +53,7 @@ async function startServer() {
     // Custom middleware (using shared middleware - NO MORE COPY-PASTE!)
     app.use(defaultCorrelationIdMiddleware);
   app.use(requestLoggingMiddleware({
-  customLogger: (level, message, metadata) => {
+  customLogger: (level: string, message: string, metadata?: any) => {
     console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');  // ← DOĞRU!
   }
 }));
