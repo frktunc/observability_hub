@@ -1,4 +1,5 @@
 import { Pool, PoolClient, QueryResult } from 'pg';
+import { ObservabilityLogger } from '@observability-hub/observability';
 import { config, derivedConfig } from '../config';
 import { Order, OrderItem, Address, CreateOrderRequest, UpdateOrderRequest, OrderFilters } from '../types/order';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,8 +7,16 @@ import { v4 as uuidv4 } from 'uuid';
 export class DatabaseService {
   private pool: Pool;
   private isConnected = false;
+  private logger: ObservabilityLogger;
 
   constructor() {
+    this.logger = new ObservabilityLogger({
+      serviceName: config.SERVICE_NAME,
+      serviceVersion: config.SERVICE_VERSION,
+      environment: config.NODE_ENV,
+      defaultLogLevel: config.LOG_LEVEL as any,
+    });
+
     this.pool = new Pool({
       connectionString: derivedConfig.database.url,
       host: derivedConfig.database.host,
@@ -27,33 +36,35 @@ export class DatabaseService {
 
   private setupEventHandlers(): void {
     this.pool.on('connect', (client: PoolClient) => {
-      console.log('Database client connected');
+      this.logger.info('Database client connected', { component: 'database' });
       this.isConnected = true;
     });
 
     this.pool.on('error', (err: Error) => {
-      console.error('Database pool error:', err);
+      this.logger.error('Database pool error', err, { component: 'database' });
       this.isConnected = false;
     });
 
     this.pool.on('remove', () => {
-      console.log('Database client removed from pool');
+      this.logger.debug('Database client removed from pool', { component: 'database' });
     });
   }
 
   async connect(): Promise<void> {
     try {
+      this.logger.info('Initializing database connection', { component: 'database' });
+      
       const client = await this.pool.connect();
       await client.query('SELECT NOW()');
       client.release();
       
-      console.log('✅ Database connected successfully');
+      this.logger.info('Database connected successfully', { component: 'database' });
       this.isConnected = true;
       
       // Initialize schema
       await this.initializeSchema();
     } catch (error) {
-      console.error('❌ Database connection failed:', error);
+      this.logger.error('Database connection failed', error as Error, { component: 'database' });
       this.isConnected = false;
       throw error;
     }
@@ -62,6 +73,8 @@ export class DatabaseService {
   async initializeSchema(): Promise<void> {
     const client = await this.pool.connect();
     try {
+      this.logger.info('Initializing database schema', { component: 'database' });
+      
       // Create orders table
       const createOrdersTable = `
         CREATE TABLE IF NOT EXISTS orders (
@@ -128,9 +141,9 @@ export class DatabaseService {
       `;
 
       await client.query(createOrdersTable);
-      console.log('✅ Orders database schema initialized');
+      this.logger.info('Orders database schema initialized', { component: 'database' });
     } catch (error) {
-      console.error('❌ Failed to initialize orders database schema:', error);
+      this.logger.error('Failed to initialize orders database schema', error as Error, { component: 'database' });
       throw error;
     } finally {
       client.release();
@@ -139,11 +152,12 @@ export class DatabaseService {
 
   async disconnect(): Promise<void> {
     try {
+      this.logger.info('Disconnecting from database', { component: 'database' });
       await this.pool.end();
-      console.log('Database disconnected');
+      this.logger.info('Database disconnected', { component: 'database' });
       this.isConnected = false;
     } catch (error) {
-      console.error('Error disconnecting from database:', error);
+      this.logger.error('Error disconnecting from database', error as Error, { component: 'database' });
       throw error;
     }
   }
@@ -157,47 +171,52 @@ export class DatabaseService {
     orders: Order[];
     total: number;
   }> {
-    const { userId, status, startDate, endDate, limit = 50, offset = 0 } = filters;
-
-    let whereClause = 'WHERE 1=1';
-    const queryParams: any[] = [];
-    let paramIndex = 1;
-
-    if (userId) {
-      whereClause += ` AND user_id = $${paramIndex}`;
-      queryParams.push(userId);
-      paramIndex++;
-    }
-
-    if (status) {
-      whereClause += ` AND status = $${paramIndex}`;
-      queryParams.push(status);
-      paramIndex++;
-    }
-
-    if (startDate) {
-      whereClause += ` AND created_at >= $${paramIndex}`;
-      queryParams.push(startDate);
-      paramIndex++;
-    }
-
-    if (endDate) {
-      whereClause += ` AND created_at <= $${paramIndex}`;
-      queryParams.push(endDate);
-      paramIndex++;
-    }
-
-    const countQuery = `SELECT COUNT(*) FROM orders ${whereClause}`;
-    const dataQuery = `
-      SELECT * FROM orders 
-      ${whereClause}
-      ORDER BY created_at DESC 
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `;
-
-    queryParams.push(limit, offset);
-
     try {
+      this.logger.debug('Fetching all orders', { 
+        operation: 'getAllOrders',
+        filters 
+      });
+
+      const { userId, status, startDate, endDate, limit = 50, offset = 0 } = filters;
+
+      let whereClause = 'WHERE 1=1';
+      const queryParams: any[] = [];
+      let paramIndex = 1;
+
+      if (userId) {
+        whereClause += ` AND user_id = $${paramIndex}`;
+        queryParams.push(userId);
+        paramIndex++;
+      }
+
+      if (status) {
+        whereClause += ` AND status = $${paramIndex}`;
+        queryParams.push(status);
+        paramIndex++;
+      }
+
+      if (startDate) {
+        whereClause += ` AND created_at >= $${paramIndex}`;
+        queryParams.push(startDate);
+        paramIndex++;
+      }
+
+      if (endDate) {
+        whereClause += ` AND created_at <= $${paramIndex}`;
+        queryParams.push(endDate);
+        paramIndex++;
+      }
+
+      const countQuery = `SELECT COUNT(*) FROM orders ${whereClause}`;
+      const dataQuery = `
+        SELECT * FROM orders 
+        ${whereClause}
+        ORDER BY created_at DESC 
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `;
+
+      queryParams.push(limit, offset);
+
       const [countResult, dataResult] = await Promise.all([
         this.pool.query(countQuery, queryParams.slice(0, -2)),
         this.pool.query(dataQuery, queryParams)
@@ -229,21 +248,30 @@ export class DatabaseService {
         })
       );
 
+      this.logger.info('Successfully fetched all orders', { 
+        operation: 'getAllOrders',
+        total: parseInt(countResult.rows[0].count),
+        returned: ordersWithDetails.length
+      });
+
       return {
         orders: ordersWithDetails,
         total: parseInt(countResult.rows[0].count)
       };
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      this.logger.error('Failed to fetch orders', error as Error, { operation: 'getAllOrders' });
       throw error;
     }
   }
 
   async getOrderById(id: string): Promise<Order | null> {
     try {
+      this.logger.debug('Fetching order by ID', { operation: 'getOrderById', orderId: id });
+      
       const result = await this.pool.query('SELECT * FROM orders WHERE id = $1', [id]);
       
       if (result.rows.length === 0) {
+        this.logger.warn('Order not found by ID', { operation: 'getOrderById', orderId: id });
         return null;
       }
 
@@ -256,7 +284,7 @@ export class DatabaseService {
       const shippingAddress = addresses.find(addr => addr.type === 'shipping');
       const billingAddress = addresses.find(addr => addr.type === 'billing');
 
-      return {
+      const orderWithDetails = {
         ...order,
         items,
         shippingAddress,
@@ -268,8 +296,19 @@ export class DatabaseService {
         paymentMethod: order.payment_method,
         correlationId: order.correlation_id
       };
+
+      this.logger.info('Successfully fetched order by ID', { 
+        operation: 'getOrderById', 
+        orderId: id,
+        status: orderWithDetails.status
+      });
+
+      return orderWithDetails;
     } catch (error) {
-      console.error('Error fetching order by ID:', error);
+      this.logger.error('Failed to fetch order by ID', error as Error, { 
+        operation: 'getOrderById', 
+        orderId: id 
+      });
       throw error;
     }
   }
@@ -277,51 +316,127 @@ export class DatabaseService {
   async createOrder(orderData: CreateOrderRequest): Promise<Order> {
     const client = await this.pool.connect();
     try {
+      this.logger.info('Creating new order', { 
+        operation: 'createOrder',
+        userId: orderData.userId,
+        itemsCount: orderData.items.length,
+        totalAmount: orderData.totalAmount
+      });
+
       await client.query('BEGIN');
 
       const orderId = uuidv4();
-      
-      // Insert order
-      const orderResult = await client.query(`
-        INSERT INTO orders (id, user_id, total_amount, currency, payment_method)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-      `, [orderId, orderData.userId, orderData.totalAmount, orderData.currency, orderData.paymentMethod]);
+      const correlationId = orderData.correlationId || uuidv4();
 
-      const order = orderResult.rows[0];
+      // Create order
+      const orderResult = await client.query(
+        `INSERT INTO orders (id, user_id, status, total_amount, currency, payment_method, notes, correlation_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [
+          orderId,
+          orderData.userId,
+          orderData.status || 'pending',
+          orderData.totalAmount,
+          orderData.currency || 'USD',
+          orderData.paymentMethod,
+          orderData.notes,
+          correlationId
+        ]
+      );
 
-      // Insert order items
+      // Create order items
       for (const item of orderData.items) {
-        await client.query(`
-          INSERT INTO order_items (order_id, product_id, quantity, price)
-          VALUES ($1, $2, $3, $4)
-        `, [orderId, item.productId, item.quantity, item.price]);
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, quantity, price)
+           VALUES ($1, $2, $3, $4)`,
+          [orderId, item.productId, item.quantity, item.price]
+        );
       }
 
-      // Insert addresses
-      await client.query(`
-        INSERT INTO addresses (order_id, type, street, city, state, postal_code, country, zip_code, phone)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [orderId, 'shipping', orderData.shippingAddress.street, orderData.shippingAddress.city, 
-          orderData.shippingAddress.state, orderData.shippingAddress.postalCode, 
-          orderData.shippingAddress.country, orderData.shippingAddress.zipCode, 
-          orderData.shippingAddress.phone]);
+      // Create addresses
+      if (orderData.shippingAddress) {
+        await client.query(
+          `INSERT INTO addresses (order_id, type, street, city, state, postal_code, country, zip_code, phone)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            orderId, 'shipping',
+            orderData.shippingAddress.street,
+            orderData.shippingAddress.city,
+            orderData.shippingAddress.state,
+            orderData.shippingAddress.postalCode,
+            orderData.shippingAddress.country,
+            orderData.shippingAddress.zipCode,
+            orderData.shippingAddress.phone
+          ]
+        );
+      }
 
-      await client.query(`
-        INSERT INTO addresses (order_id, type, street, city, state, postal_code, country, zip_code, phone)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `, [orderId, 'billing', orderData.billingAddress.street, orderData.billingAddress.city, 
-          orderData.billingAddress.state, orderData.billingAddress.postalCode, 
-          orderData.billingAddress.country, orderData.billingAddress.zipCode, 
-          orderData.billingAddress.phone]);
+      if (orderData.billingAddress) {
+        await client.query(
+          `INSERT INTO addresses (order_id, type, street, city, state, postal_code, country, zip_code, phone)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            orderId, 'billing',
+            orderData.billingAddress.street,
+            orderData.billingAddress.city,
+            orderData.billingAddress.state,
+            orderData.billingAddress.postalCode,
+            orderData.billingAddress.country,
+            orderData.billingAddress.zipCode,
+            orderData.billingAddress.phone
+          ]
+        );
+      }
 
       await client.query('COMMIT');
 
-      // Return the complete order
-      return await this.getOrderById(orderId) as Order;
+      const order = orderResult.rows[0];
+      const [items, addresses] = await Promise.all([
+        this.getOrderItems(orderId),
+        this.getOrderAddresses(orderId)
+      ]);
+
+      const shippingAddress = addresses.find(addr => addr.type === 'shipping');
+      const billingAddress = addresses.find(addr => addr.type === 'billing');
+
+      const newOrder = {
+        ...order,
+        items,
+        shippingAddress,
+        billingAddress,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        userId: order.user_id,
+        totalAmount: parseFloat(order.total_amount),
+        paymentMethod: order.payment_method,
+        correlationId: order.correlation_id
+      };
+
+      this.logger.businessEvent({
+        eventType: 'order.created',
+        aggregateId: newOrder.id,
+        aggregateType: 'Order',
+        eventVersion: 1,
+        correlationId: correlationId,
+        timestamp: new Date().toISOString(),
+        data: newOrder,
+      });
+
+      this.logger.info('Successfully created order', { 
+        operation: 'createOrder',
+        orderId: newOrder.id,
+        userId: newOrder.userId,
+        totalAmount: newOrder.totalAmount
+      });
+
+      return newOrder;
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('Error creating order:', error);
+      this.logger.error('Failed to create order', error as Error, { 
+        operation: 'createOrder',
+        userId: orderData.userId 
+      });
       throw error;
     } finally {
       client.release();
@@ -329,66 +444,153 @@ export class DatabaseService {
   }
 
   async updateOrder(id: string, updates: UpdateOrderRequest): Promise<Order | null> {
+    const client = await this.pool.connect();
     try {
-      const setClause: string[] = [];
-      const queryParams: any[] = [];
+      this.logger.info('Updating order', { 
+        operation: 'updateOrder',
+        orderId: id,
+        updateFields: Object.keys(updates)
+      });
+
+      await client.query('BEGIN');
+
+      // Build dynamic update query
+      const updateFields: string[] = [];
+      const values: any[] = [];
       let paramIndex = 1;
 
       if (updates.status !== undefined) {
-        setClause.push(`status = $${paramIndex}`);
-        queryParams.push(updates.status);
-        paramIndex++;
+        updateFields.push(`status = $${paramIndex++}`);
+        values.push(updates.status);
       }
 
       if (updates.totalAmount !== undefined) {
-        setClause.push(`total_amount = $${paramIndex}`);
-        queryParams.push(updates.totalAmount);
-        paramIndex++;
-      }
-
-      if (updates.currency !== undefined) {
-        setClause.push(`currency = $${paramIndex}`);
-        queryParams.push(updates.currency);
-        paramIndex++;
+        updateFields.push(`total_amount = $${paramIndex++}`);
+        values.push(updates.totalAmount);
       }
 
       if (updates.paymentMethod !== undefined) {
-        setClause.push(`payment_method = $${paramIndex}`);
-        queryParams.push(updates.paymentMethod);
-        paramIndex++;
+        updateFields.push(`payment_method = $${paramIndex++}`);
+        values.push(updates.paymentMethod);
       }
 
-      if (setClause.length === 0) {
-        return await this.getOrderById(id);
+      if (updates.notes !== undefined) {
+        updateFields.push(`notes = $${paramIndex++}`);
+        values.push(updates.notes);
       }
 
-      queryParams.push(id);
+      if (updateFields.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      values.push(id);
+
       const updateQuery = `
         UPDATE orders 
-        SET ${setClause.join(', ')}, updated_at = CURRENT_TIMESTAMP
+        SET ${updateFields.join(', ')}
         WHERE id = $${paramIndex}
         RETURNING *
       `;
 
-      const result = await this.pool.query(updateQuery, queryParams);
-      
+      const result = await client.query(updateQuery, values);
+
       if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        this.logger.warn('Order not found for update', { 
+          operation: 'updateOrder',
+          orderId: id 
+        });
         return null;
       }
 
-      return await this.getOrderById(id);
+      await client.query('COMMIT');
+
+      const order = result.rows[0];
+      const [items, addresses] = await Promise.all([
+        this.getOrderItems(id),
+        this.getOrderAddresses(id)
+      ]);
+
+      const shippingAddress = addresses.find(addr => addr.type === 'shipping');
+      const billingAddress = addresses.find(addr => addr.type === 'billing');
+
+      const updatedOrder = {
+        ...order,
+        items,
+        shippingAddress,
+        billingAddress,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        userId: order.user_id,
+        totalAmount: parseFloat(order.total_amount),
+        paymentMethod: order.payment_method,
+        correlationId: order.correlation_id
+      };
+
+      this.logger.businessEvent({
+        eventType: 'order.updated',
+        aggregateId: updatedOrder.id,
+        aggregateType: 'Order',
+        eventVersion: 1,
+        correlationId: updatedOrder.correlationId || uuidv4(),
+        timestamp: new Date().toISOString(),
+        data: updatedOrder,
+      });
+
+      this.logger.info('Successfully updated order', { 
+        operation: 'updateOrder',
+        orderId: id,
+        newStatus: updatedOrder.status
+      });
+
+      return updatedOrder;
     } catch (error) {
-      console.error('Error updating order:', error);
+      await client.query('ROLLBACK');
+      this.logger.error('Failed to update order', error as Error, { 
+        operation: 'updateOrder',
+        orderId: id 
+      });
       throw error;
+    } finally {
+      client.release();
     }
   }
 
   async deleteOrder(id: string): Promise<boolean> {
     try {
+      this.logger.info('Deleting order', { operation: 'deleteOrder', orderId: id });
+      
       const result = await this.pool.query('DELETE FROM orders WHERE id = $1', [id]);
-      return (result.rowCount ?? 0) > 0;
+      const deleted = (result.rowCount ?? 0) > 0;
+      
+      if (deleted) {
+        this.logger.businessEvent({
+          eventType: 'order.deleted',
+          aggregateId: id,
+          aggregateType: 'Order',
+          eventVersion: 1,
+          correlationId: uuidv4(),
+          timestamp: new Date().toISOString(),
+          data: { orderId: id },
+        });
+        
+        this.logger.info('Successfully deleted order', { 
+          operation: 'deleteOrder',
+          orderId: id 
+        });
+      } else {
+        this.logger.warn('Order not found for deletion', { 
+          operation: 'deleteOrder',
+          orderId: id 
+        });
+      }
+      
+      return deleted;
     } catch (error) {
-      console.error('Error deleting order:', error);
+      this.logger.error('Failed to delete order', error as Error, { 
+        operation: 'deleteOrder',
+        orderId: id 
+      });
       throw error;
     }
   }
@@ -396,16 +598,22 @@ export class DatabaseService {
   private async getOrderItems(orderId: string): Promise<OrderItem[]> {
     try {
       const result = await this.pool.query(
-        'SELECT product_id, quantity, price FROM order_items WHERE order_id = $1',
+        'SELECT * FROM order_items WHERE order_id = $1',
         [orderId]
       );
-      return result.rows.map(row => ({
-        productId: row.product_id,
-        quantity: row.quantity,
-        price: parseFloat(row.price)
+      
+      return result.rows.map(item => ({
+        id: item.id,
+        productId: item.product_id,
+        quantity: item.quantity,
+        price: parseFloat(item.price),
+        createdAt: item.created_at
       }));
     } catch (error) {
-      console.error('Error fetching order items:', error);
+      this.logger.error('Failed to get order items', error as Error, { 
+        operation: 'getOrderItems',
+        orderId 
+      });
       throw error;
     }
   }
@@ -416,18 +624,24 @@ export class DatabaseService {
         'SELECT * FROM addresses WHERE order_id = $1',
         [orderId]
       );
-      return result.rows.map(row => ({
-        type: row.type,
-        street: row.street,
-        city: row.city,
-        state: row.state,
-        postalCode: row.postal_code,
-        country: row.country,
-        zipCode: row.zip_code,
-        phone: row.phone
+      
+      return result.rows.map(addr => ({
+        id: addr.id,
+        type: addr.type,
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        postalCode: addr.postal_code,
+        country: addr.country,
+        zipCode: addr.zip_code,
+        phone: addr.phone,
+        createdAt: addr.created_at
       }));
     } catch (error) {
-      console.error('Error fetching order addresses:', error);
+      this.logger.error('Failed to get order addresses', error as Error, { 
+        operation: 'getOrderAddresses',
+        orderId 
+      });
       throw error;
     }
   }

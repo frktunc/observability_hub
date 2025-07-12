@@ -1,16 +1,20 @@
 import { Router, Request, Response } from 'express';
+import { ObservabilityLogger } from '@observability-hub/observability';
 import { db, Product, CreateProductRequest, UpdateProductRequest, ProductFilters } from '../services/database';
-import { config } from '../config';
+import { config, derivedConfig } from '../config';
 
 const router = Router();
 
-// Simple console logger (replace with proper observability logger if needed)
-const logger = {
-  info: (message: string, metadata?: any) => console.log(`[INFO] ${message}`, metadata || ''),
-  warn: (message: string, metadata?: any) => console.warn(`[WARN] ${message}`, metadata || ''),
-  error: (message: string, metadata?: any) => console.error(`[ERROR] ${message}`, metadata || ''),
-  debug: (message: string, metadata?: any) => console.debug(`[DEBUG] ${message}`, metadata || '')
-};
+// Initialize logger for route-level logging
+const logger = new ObservabilityLogger({
+  serviceName: config.SERVICE_NAME,
+  serviceVersion: config.SERVICE_VERSION,
+  environment: config.NODE_ENV,
+  rabbitmqUrl: derivedConfig.rabbitmq.url,
+  rabbitmqVhost: derivedConfig.rabbitmq.vhost,
+  rabbitmqExchange: derivedConfig.rabbitmq.exchange,
+  defaultLogLevel: config.LOG_LEVEL as any,
+});
 
 // GET /api/v1/products - List all products
 router.get('/', async (req: Request, res: Response): Promise<void> => {
@@ -35,6 +39,12 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     
     const result = await db.getAllProducts(filters, pagination);
     
+    logger.info('Products fetched successfully', {
+      totalProducts: result.total,
+      returnedProducts: result.products.length,
+      correlationId
+    });
+    
     res.json({
       products: result.products,
       total: result.total,
@@ -43,7 +53,9 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       correlationId
     });
   } catch (error) {
-    logger.error('Error fetching products:', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Failed to fetch products', error instanceof Error ? error : new Error(String(error)), {
+      correlationId
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch products',
@@ -63,6 +75,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     const product = await db.getProductById(productId);
     
     if (!product) {
+      logger.warn('Product not found by ID', { productId, correlationId });
       res.status(404).json({
         error: 'Product not found',
         productId,
@@ -71,9 +84,13 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
+    logger.info('Product fetched successfully by ID', { productId, correlationId });
     res.json({ product, correlationId });
   } catch (error) {
-    logger.error('Error fetching product by ID:', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Failed to fetch product by ID', error instanceof Error ? error : new Error(String(error)), {
+      productId,
+      correlationId
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch product',
@@ -93,6 +110,7 @@ router.get('/sku/:sku', async (req: Request, res: Response): Promise<void> => {
     const product = await db.getProductBySku(sku);
     
     if (!product) {
+      logger.warn('Product not found by SKU', { sku, correlationId });
       res.status(404).json({
         error: 'Product not found',
         sku,
@@ -101,9 +119,13 @@ router.get('/sku/:sku', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
+    logger.info('Product fetched successfully by SKU', { sku, correlationId });
     res.json({ product, correlationId });
   } catch (error) {
-    logger.error('Error fetching product by SKU:', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Failed to fetch product by SKU', error instanceof Error ? error : new Error(String(error)), {
+      sku,
+      correlationId
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch product',
@@ -123,22 +145,21 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     
     const product = await db.createProduct(productData);
     
-    // Log business event
-    logger.info('Product created', {
-      eventType: 'product.created',
+    logger.info('Product created successfully', {
       productId: product.id,
-      name: product.name,
+      productName: product.name,
       sku: product.sku,
       category: product.category,
       price: product.price,
       stock_quantity: product.stock_quantity,
-      timestamp: new Date(),
       correlationId
     });
     
     res.status(201).json({ product, correlationId });
   } catch (error) {
-    logger.error('Error creating product:', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Failed to create product', error instanceof Error ? error : new Error(String(error)), {
+      correlationId
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to create product',
@@ -160,6 +181,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     const product = await db.updateProduct(productId, updateData);
     
     if (!product) {
+      logger.warn('Product not found for update', { productId, correlationId });
       res.status(404).json({
         error: 'Product not found',
         productId,
@@ -168,20 +190,20 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
-    // Log business event
-    logger.info('Product updated', {
-      eventType: 'product.updated',
+    logger.info('Product updated successfully', {
       productId,
-      name: product.name,
+      productName: product.name,
       sku: product.sku,
       changes: updateData,
-      timestamp: new Date(),
       correlationId
     });
     
     res.json({ product, correlationId });
   } catch (error) {
-    logger.error('Error updating product:', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Failed to update product', error instanceof Error ? error : new Error(String(error)), {
+      productId,
+      correlationId
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to update product',
@@ -201,6 +223,7 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     const success = await db.deleteProduct(productId);
     
     if (!success) {
+      logger.warn('Product not found for deletion', { productId, correlationId });
       res.status(404).json({
         error: 'Product not found',
         productId,
@@ -209,21 +232,17 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     
-    // Log business event
-    logger.info('Product deleted', {
-      eventType: 'product.deleted',
+    logger.info('Product deleted successfully', {
       productId,
-      timestamp: new Date(),
       correlationId
     });
     
-    res.json({
-      message: 'Product deleted successfully',
+    res.status(204).send();
+  } catch (error) {
+    logger.error('Failed to delete product', error instanceof Error ? error : new Error(String(error)), {
       productId,
       correlationId
     });
-  } catch (error) {
-    logger.error('Error deleting product:', error instanceof Error ? error : new Error(String(error)));
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to delete product',
@@ -241,12 +260,16 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     
     const stats = await db.getProductStats();
     
+    logger.info('Product statistics fetched successfully', { correlationId });
+    
     res.json({
       stats,
       correlationId
     });
   } catch (error) {
-    logger.error('Error fetching product stats:', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Failed to fetch product statistics', error instanceof Error ? error : new Error(String(error)), {
+      correlationId
+    });
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to fetch product statistics',

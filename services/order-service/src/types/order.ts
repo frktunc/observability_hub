@@ -15,12 +15,15 @@ export interface Order {
 }
 
 export interface OrderItem {
+  id?: string;
   productId: string;
   quantity: number;
   price: number;
+  createdAt?: Date;
 }
 
 export interface Address {
+  id?: string;
   street: string;
   city: string;
   state: string;
@@ -28,6 +31,7 @@ export interface Address {
   country: string;
   zipCode: string;
   phone?: string;
+  createdAt?: Date;
 }
 
 export interface PaymentMethod {
@@ -49,10 +53,13 @@ export interface CreateOrderRequest {
   userId: string;
   items: OrderItem[];
   totalAmount: number;
-  currency: string;
-  shippingAddress: Address;
-  billingAddress: Address;
-  paymentMethod: string;
+  currency?: string;
+  shippingAddress?: Address;
+  billingAddress?: Address;
+  paymentMethod?: string;
+  status?: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  notes?: string;
+  correlationId?: string;
 }
 
 export interface UpdateOrderRequest {
@@ -63,6 +70,7 @@ export interface UpdateOrderRequest {
   shippingAddress?: Address;
   billingAddress?: Address;
   paymentMethod?: string;
+  notes?: string;
 }
 
 export interface OrderFilters {

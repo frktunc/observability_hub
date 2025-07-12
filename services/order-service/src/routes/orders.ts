@@ -172,7 +172,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const order = await db.createOrder(orderData);
     
     logger.info('Order created successfully', {
-      eventType: 'order.created',
       orderId: order.id,
       userId: order.userId,
       totalAmount: order.totalAmount,
@@ -240,7 +239,6 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     logger.info('Order updated successfully', {
-      eventType: 'order.updated',
       orderId,
       changes: updateData,
       newStatus: updatedOrder.status,
@@ -305,19 +303,12 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     logger.info('Order deleted successfully', {
-      eventType: 'order.deleted',
       orderId,
       correlationId,
-      component: 'orders-api',
-      timestamp: new Date().toISOString()
+      component: 'orders-api'
     });
 
-    res.json({ 
-      success: true, 
-      orderId, 
-      correlationId,
-      timestamp: new Date().toISOString()
-    });
+    res.status(204).send();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorObj = error instanceof Error ? error : new Error(String(error));
