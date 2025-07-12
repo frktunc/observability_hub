@@ -1,15 +1,18 @@
 import { Router, Request, Response } from 'express';
+import { getMetrics } from '@observability-hub/observability/middleware';
 
 const router = Router();
 
 router.get('/', (req: Request, res: Response) => {
-  res.json({
-    metrics: {
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      cpu: process.cpuUsage(),
-    },
-  });
+  try {
+    const metrics = getMetrics();
+    res.json(metrics);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get metrics',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 export { router as metricsRoutes }; 

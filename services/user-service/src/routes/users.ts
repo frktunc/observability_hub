@@ -6,7 +6,7 @@ import { userRepository, CreateUserRequest, UpdateUserRequest } from '../service
 
 const router = Router();
 
-// Initialize logger
+// Initialize logger for route-level logging
 const logger = new ObservabilityLogger({
   serviceName: config.SERVICE_NAME,
   serviceVersion: config.SERVICE_VERSION,
@@ -110,17 +110,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     const newUser = await userRepository.createUser(userData);
 
-    // Log business event
-    await logger.businessEvent({
-      eventType: 'user.created',
-      aggregateId: newUser.id,
-      aggregateType: 'User',
-      eventVersion: 1,
-      correlationId: req.correlationId || uuidv4(),
-      timestamp: new Date().toISOString(),
-      data: newUser,
-    });
-
     await logger.info('User created successfully', {
       operation: 'create_user',
       requestId: req.correlationId || '',
@@ -221,9 +210,16 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Check if user exists
-    const existingUser = await userRepository.getUserById(id as string);
-    if (!existingUser) {
+    // Update user
+    const userData: UpdateUserRequest = {};
+    if (name !== undefined) userData.name = name;
+    if (email !== undefined) userData.email = email;
+    if (role !== undefined) userData.role = role;
+    if (country !== undefined) userData.country = country;
+
+    const updatedUser = await userRepository.updateUser(id as string, userData);
+
+    if (!updatedUser) {
       await logger.warn('User update failed - user not found', {
         operation: 'update_user',
         requestId: req.correlationId || '',
@@ -236,34 +232,6 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-
-    // Update user
-    const userData: UpdateUserRequest = {};
-    if (name !== undefined) userData.name = name;
-    if (email !== undefined) userData.email = email;
-    if (role !== undefined) userData.role = role;
-    if (country !== undefined) userData.country = country;
-
-    const updatedUser = await userRepository.updateUser(id as string, userData);
-
-    if (!updatedUser) {
-      res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-      return;
-    }
-
-    // Log business event
-    await logger.businessEvent({
-      eventType: 'user.updated',
-      aggregateId: updatedUser.id,
-      aggregateType: 'User',
-      eventVersion: 1,
-      correlationId: req.correlationId || uuidv4(),
-      timestamp: new Date().toISOString(),
-      data: updatedUser,
-    });
 
     await logger.info('User updated successfully', {
       operation: 'update_user',
@@ -280,7 +248,6 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       operation: 'update_user',
       requestId: req.correlationId || '',
       userId: req.params.id,
-      requestBody: req.body,
     });
 
     // Handle specific database errors
@@ -303,10 +270,9 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const deleted = await userRepository.deleteUser(id as string);
 
-    // Check if user exists
-    const existingUser = await userRepository.getUserById(id as string);
-    if (!existingUser) {
+    if (!deleted) {
       await logger.warn('User deletion failed - user not found', {
         operation: 'delete_user',
         requestId: req.correlationId || '',
@@ -320,38 +286,13 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Delete user
-    const deleted = await userRepository.deleteUser(id as string);
-
-    if (!deleted) {
-      res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
-      return;
-    }
-
-    // Log business event
-    await logger.businessEvent({
-      eventType: 'user.deleted',
-      aggregateId: id as string,
-      aggregateType: 'User',
-      eventVersion: 1,
-      correlationId: req.correlationId || uuidv4(),
-      timestamp: new Date().toISOString(),
-      data: { id: id, deletedUser: existingUser },
-    });
-
     await logger.info('User deleted successfully', {
       operation: 'delete_user',
       requestId: req.correlationId || '',
       userId: id,
     });
 
-    res.json({
-      success: true,
-      message: 'User deleted successfully',
-    });
+    res.status(204).send();
   } catch (error) {
     await logger.error('Failed to delete user', error as Error, {
       operation: 'delete_user',
@@ -366,30 +307,24 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// GET /api/v1/users/role/:role - Get users by role
-router.get('/role/:role', async (req: Request, res: Response): Promise<void> => {
+// GET /api/v1/users/stats/count - Get user count
+router.get('/stats/count', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { role } = req.params;
-    
-    await logger.info('Users by role requested', {
-      operation: 'list_users_by_role',
-      requestId: req.correlationId || '',
-      role,
+    await logger.info('User count requested', {
+      operation: 'get_user_count',
+      requestId: req.correlationId || undefined,
     });
 
-    const users = await userRepository.getUsersByRole(role as string);
+    const count = await userRepository.getUsersCount();
 
     res.json({
       success: true,
-      data: users,
-      count: users.length,
-      role,
+      data: { count },
     });
   } catch (error) {
-    await logger.error('Failed to list users by role', error as Error, {
-      operation: 'list_users_by_role',
-      requestId: req.correlationId || '',
-      role: req.params.role,
+    await logger.error('Failed to get user count', error as Error, {
+      operation: 'get_user_count',
+      requestId: req.correlationId,
     });
 
     res.status(500).json({
@@ -399,45 +334,12 @@ router.get('/role/:role', async (req: Request, res: Response): Promise<void> => 
   }
 });
 
-// GET /api/v1/users/country/:country - Get users by country
-router.get('/country/:country', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { country } = req.params;
-    
-    await logger.info('Users by country requested', {
-      operation: 'list_users_by_country',
-      requestId: req.correlationId || '',
-      country,
-    });
-
-    const users = await userRepository.getUsersByCountry(country as string);
-
-    res.json({
-      success: true,
-      data: users,
-      count: users.length,
-      country,
-    });
-  } catch (error) {
-    await logger.error('Failed to list users by country', error as Error, {
-      operation: 'list_users_by_country',
-      requestId: req.correlationId || '',
-      country: req.params.country,
-    });
-
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-    });
-  }
-});
-
-// GET /api/v1/users/stats/countries - Get country statistics for Grafana
-router.get('/stats/countries', async (req: Request, res: Response): Promise<void> => {
+// GET /api/v1/users/stats/country - Get country statistics
+router.get('/stats/country', async (req: Request, res: Response): Promise<void> => {
   try {
     await logger.info('Country statistics requested', {
-      operation: 'country_stats',
-      requestId: req.correlationId || '',
+      operation: 'get_country_stats',
+      requestId: req.correlationId || undefined,
     });
 
     const stats = await userRepository.getCountryStats();
@@ -445,12 +347,11 @@ router.get('/stats/countries', async (req: Request, res: Response): Promise<void
     res.json({
       success: true,
       data: stats,
-      count: stats.length,
     });
   } catch (error) {
     await logger.error('Failed to get country statistics', error as Error, {
-      operation: 'country_stats',
-      requestId: req.correlationId || '',
+      operation: 'get_country_stats',
+      requestId: req.correlationId,
     });
 
     res.status(500).json({
