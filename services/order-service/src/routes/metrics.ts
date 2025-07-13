@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { getMetrics } from '@observability-hub/observability/middleware';
+import { register } from 'prom-client';
 
 const router = Router();
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const metrics = getMetrics();
-    res.json(metrics);
+    res.set('Content-Type', register.contentType);
+    res.end(await register.metrics());
   } catch (error) {
     res.status(500).json({
       error: 'Failed to get metrics',
@@ -15,4 +15,4 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
-export default router; 
+export default router;

@@ -178,7 +178,7 @@ services:
     networks:
       - observability
     depends_on:
-      - postgres
+      - prometheus
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -190,6 +190,75 @@ services:
           memory: 256M
         reservations:
           memory: 128M
+
+  # Prometheus Metrics
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: obs_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9091:9090"
+    networks:
+      - observability
+    depends_on:
+      - cadvisor
+      - rabbitmq_exporter
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.1
+    container_name: obs_cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8088:8080"
+    networks:
+      - observability
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # RabbitMQ Exporter
+  rabbitmq_exporter:
+    image: kbudde/rabbitmq-exporter:v0.29.0
+    container_name: obs_rabbitmq_exporter
+    restart: unless-stopped
+    environment:
+      RABBIT_USER: ${RABBITMQ_USER:-obs_user}
+      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-obs_password}
+      RABBIT_URL: http://obs_rabbitmq:15672
+    ports:
+      - "9419:9419"
+    networks:
+      - observability
+    depends_on:
+      - rabbitmq
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
 
   # User Service Database
   user_service_db:
