@@ -62,6 +62,10 @@ const configSchema = z.object({
   METRICS_ENABLED: z.coerce.boolean().default(true),
   METRICS_PORT: z.coerce.number().min(1).max(65535).default(9090),
   METRICS_PATH: z.string().default('/metrics'),
+
+  // Tracing Configuration
+  JAEGER_ENABLED: z.coerce.boolean().default(true),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://jaeger:4318/v1/traces'),
   
   // Health Check Configuration
   HEALTH_CHECK_ENABLED: z.coerce.boolean().default(true),
@@ -203,4 +207,4 @@ export const validateConfiguration = (): void => {
 };
 
 export type Config = typeof config;
-export type DerivedConfig = typeof derivedConfig; 
+export type DerivedConfig = typeof derivedConfig;

@@ -5,11 +5,11 @@ export * from './metrics';
 export { defaultCorrelationIdMiddleware, correlationIdMiddleware } from './correlation-id';
 export { defaultErrorHandler, errorHandlerMiddleware } from './error-handler';
 export { defaultRequestLogging, minimalRequestLogging, requestLoggingMiddleware } from './request-logging';
-export { defaultMetrics, lightweightMetrics, metricsMiddleware, getMetrics, resetMetrics } from './metrics';
+export { defaultMetrics, metricsMiddleware, getPrometheusRegister } from './metrics';
 export type { CorrelationIdOptions } from './correlation-id';
 export type { ErrorHandlerOptions, ErrorResponse } from './error-handler';
 export type { RequestLoggingOptions } from './request-logging';
-export type { MetricsOptions, MetricsData } from './metrics';
+export type { MetricsMiddlewareOptions } from './metrics';
 /**
  * @observability-hub/shared-middleware
  *
@@ -44,5 +44,5 @@ export type { MetricsOptions, MetricsData } from './metrics';
  * // Error handling (must be last)
  * app.use(defaultErrorHandler);
  * ```
- */ 
+ */
 //# sourceMappingURL=index.d.ts.map

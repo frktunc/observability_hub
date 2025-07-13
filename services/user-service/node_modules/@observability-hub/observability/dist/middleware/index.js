@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetMetrics = exports.getMetrics = exports.metricsMiddleware = exports.lightweightMetrics = exports.defaultMetrics = exports.requestLoggingMiddleware = exports.minimalRequestLogging = exports.defaultRequestLogging = exports.errorHandlerMiddleware = exports.defaultErrorHandler = exports.correlationIdMiddleware = exports.defaultCorrelationIdMiddleware = void 0;
+exports.getPrometheusRegister = exports.metricsMiddleware = exports.defaultMetrics = exports.requestLoggingMiddleware = exports.minimalRequestLogging = exports.defaultRequestLogging = exports.errorHandlerMiddleware = exports.defaultErrorHandler = exports.correlationIdMiddleware = exports.defaultCorrelationIdMiddleware = void 0;
 // Export all middleware
 __exportStar(require("./correlation-id"), exports);
 __exportStar(require("./error-handler"), exports);
@@ -33,10 +33,8 @@ Object.defineProperty(exports, "minimalRequestLogging", { enumerable: true, get:
 Object.defineProperty(exports, "requestLoggingMiddleware", { enumerable: true, get: function () { return request_logging_1.requestLoggingMiddleware; } });
 var metrics_1 = require("./metrics");
 Object.defineProperty(exports, "defaultMetrics", { enumerable: true, get: function () { return metrics_1.defaultMetrics; } });
-Object.defineProperty(exports, "lightweightMetrics", { enumerable: true, get: function () { return metrics_1.lightweightMetrics; } });
 Object.defineProperty(exports, "metricsMiddleware", { enumerable: true, get: function () { return metrics_1.metricsMiddleware; } });
-Object.defineProperty(exports, "getMetrics", { enumerable: true, get: function () { return metrics_1.getMetrics; } });
-Object.defineProperty(exports, "resetMetrics", { enumerable: true, get: function () { return metrics_1.resetMetrics; } });
+Object.defineProperty(exports, "getPrometheusRegister", { enumerable: true, get: function () { return metrics_1.getPrometheusRegister; } });
 /**
  * @observability-hub/shared-middleware
  *
@@ -71,5 +69,5 @@ Object.defineProperty(exports, "resetMetrics", { enumerable: true, get: function
  * // Error handling (must be last)
  * app.use(defaultErrorHandler);
  * ```
- */ 
+ */
 //# sourceMappingURL=index.js.map

@@ -10,7 +10,7 @@ import {
   defaultCorrelationIdMiddleware,
   defaultErrorHandler,
   requestLoggingMiddleware,
-  defaultMetrics
+  metricsMiddleware
 } from '@observability-hub/observability/middleware';
 import { createRateLimitMiddleware } from './middleware/rate-limiting';
 import { initializeRedis } from './services/redis-client';
@@ -108,8 +108,9 @@ export function createApp(): express.Application {
     }
   }));
   
+  // Metrics middleware
   if (config.METRICS_ENABLED) {
-    app.use(defaultMetrics);
+    app.use(metricsMiddleware());
   }
 
   // Health check endpoint (before authentication)
@@ -333,4 +334,4 @@ declare global {
       rawBody?: Buffer;
     }
   }
-} 
+}

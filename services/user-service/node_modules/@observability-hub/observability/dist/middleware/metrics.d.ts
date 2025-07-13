@@ -1,91 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
-export interface MetricsOptions {
+export interface MetricsMiddlewareOptions {
     /**
-     * Whether to collect timing metrics
-     * @default true
-     */
-    collectTiming?: boolean;
-    /**
-     * Whether to collect request count metrics
-     * @default true
-     */
-    collectRequestCount?: boolean;
-    /**
-     * Whether to collect status code metrics
-     * @default true
-     */
-    collectStatusCodes?: boolean;
-    /**
-     * Whether to collect route-specific metrics
+     * Whether to collect route-specific metrics.
+     * If false, 'route' label will be set to a generic value.
      * @default true
      */
     collectRouteMetrics?: boolean;
     /**
-     * Custom metrics collector function
-     */
-    customCollector?: (metrics: MetricsData) => void;
-    /**
-     * Skip metrics collection for certain paths
+     * Paths to exclude from metrics collection.
+     * @default ['/metrics', '/health']
      */
     skipPaths?: string[];
-    /**
-     * Whether to log basic metrics to console
-     * @default true
-     */
-    logToConsole?: boolean;
-}
-export interface MetricsData {
-    method: string;
-    path: string;
-    statusCode: number;
-    duration: number;
-    timestamp: string;
-    correlationId?: string;
-    userAgent?: string;
 }
 /**
- * Unified metrics middleware for all microservices
+ * Express middleware to collect Prometheus metrics for HTTP requests.
  *
- * Features:
- * - Request counting
- * - Timing metrics
- * - Status code tracking
- * - Route-specific metrics
- * - Custom metrics collection
- * - Path filtering
- * - Console logging
+ * This middleware tracks:
+ * - Total number of requests (`http_requests_total`)
+ * - Request latency (`http_request_duration_seconds`)
  *
- * @param options Configuration options
- * @returns Express middleware function
+ * Metrics are labeled by method, route, and status code for detailed analysis.
+ *
+ * @param options - Configuration options for the middleware.
+ * @returns An Express middleware function.
  */
-export declare function metricsMiddleware(options?: MetricsOptions): (req: Request, res: Response, next: NextFunction) => void;
+export declare function metricsMiddleware(options?: MetricsMiddlewareOptions): (req: Request, res: Response, next: NextFunction) => void;
 /**
- * Get current metrics from the global store
- */
-export declare function getMetrics(): {
-    requests: {
-        total: number;
-        byMethod: Record<string, number>;
-        byPath: Record<string, number>;
-        byStatus: Record<number, number>;
-    };
-    timing: {
-        total: number;
-        average: number;
-        min: number;
-        max: number;
-    };
-};
-/**
- * Reset all metrics
- */
-export declare function resetMetrics(): void;
-/**
- * Default metrics middleware with standard configuration
+ * A pre-configured default metrics middleware instance.
+ * Skips `/metrics` and `/health` paths by default.
  */
 export declare const defaultMetrics: (req: Request, res: Response, next: NextFunction) => void;
 /**
- * Lightweight metrics for high-traffic scenarios
+ * Function to get the underlying prom-client register.
+ * Useful for custom metric registration.
  */
-export declare const lightweightMetrics: (req: Request, res: Response, next: NextFunction) => void;
+export declare function getPrometheusRegister(): import("prom-client").Registry<"text/plain; version=0.0.4; charset=utf-8">;
 //# sourceMappingURL=metrics.d.ts.map

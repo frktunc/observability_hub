@@ -1,5 +1,6 @@
 import type { LoggerConfig } from './logger/types';
 import type { RedisConfig } from './redis';
+export { initTracer } from './tracing';
 export { ObservabilityLogger } from './logger/logger';
 export type { LoggerConfig, LogLevel, LogContext, BusinessEvent, LogMessage } from './logger/types';
 export { createObservabilityConfigSchema, createDerivedConfig, serviceConfigs } from './config';

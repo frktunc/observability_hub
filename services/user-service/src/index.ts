@@ -1,6 +1,17 @@
-import { createApp, initializeServices } from './app';
+import { initTracer, ObservabilityLogger } from '@observability-hub/observability';
+
 import { config, derivedConfig } from './config';
-import { ObservabilityLogger } from '@observability-hub/observability';
+
+// Initialize Jaeger Tracer before all other imports
+initTracer({
+  serviceName: config.SERVICE_NAME,
+  serviceVersion: config.SERVICE_VERSION,
+  environment: config.NODE_ENV,
+  jaegerEndpoint: config.OTEL_EXPORTER_OTLP_ENDPOINT,
+  jaegerEnabled: config.JAEGER_ENABLED,
+});
+
+import { createApp, initializeServices } from './app';
 import { db } from './services/database';
 import { closeRedis } from './services/redis-client';
 
