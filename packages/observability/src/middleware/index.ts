@@ -23,17 +23,15 @@ export {
 
 export {
   defaultMetrics,
-  lightweightMetrics,
   metricsMiddleware,
-  getMetrics,
-  resetMetrics
+  getPrometheusRegister
 } from './metrics';
 
 // Re-export types for convenience
 export type { CorrelationIdOptions } from './correlation-id';
 export type { ErrorHandlerOptions, ErrorResponse } from './error-handler';
 export type { RequestLoggingOptions } from './request-logging';
-export type { MetricsOptions, MetricsData } from './metrics';
+export type { MetricsMiddlewareOptions } from './metrics';
 
 /**
  * @observability-hub/shared-middleware
@@ -69,4 +67,4 @@ export type { MetricsOptions, MetricsData } from './metrics';
  * // Error handling (must be last)
  * app.use(defaultErrorHandler);
  * ```
- */ 
+ */

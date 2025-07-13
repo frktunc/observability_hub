@@ -4,7 +4,10 @@
 // Complete Observability Solution for Microservices
 // ==============================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createObservabilitySetup = exports.createReadinessCheckHandler = exports.createHealthCheckHandler = exports.createRedisService = exports.createRedisClient = exports.RedisClient = exports.serviceConfigs = exports.createDerivedConfig = exports.createObservabilityConfigSchema = exports.ObservabilityLogger = void 0;
+exports.createObservabilitySetup = exports.createReadinessCheckHandler = exports.createHealthCheckHandler = exports.createRedisService = exports.createRedisClient = exports.RedisClient = exports.serviceConfigs = exports.createDerivedConfig = exports.createObservabilityConfigSchema = exports.ObservabilityLogger = exports.initTracer = void 0;
+// ===== TRACING EXPORTS =====
+var tracing_1 = require("./tracing");
+Object.defineProperty(exports, "initTracer", { enumerable: true, get: function () { return tracing_1.initTracer; } });
 // ===== LOGGER EXPORTS =====
 var logger_1 = require("./logger/logger");
 Object.defineProperty(exports, "ObservabilityLogger", { enumerable: true, get: function () { return logger_1.ObservabilityLogger; } });

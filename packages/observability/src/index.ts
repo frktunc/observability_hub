@@ -6,6 +6,9 @@
 import type { LoggerConfig } from './logger/types';
 import type { RedisConfig } from './redis';
 
+// ===== TRACING EXPORTS =====
+export { initTracer } from './tracing';
+
 // ===== LOGGER EXPORTS =====
 export { ObservabilityLogger } from './logger/logger';
 export type { 
@@ -105,4 +108,4 @@ export default {
   createRedisClient: require('./redis').createRedisClient,
   createHealthCheckHandler,
   createObservabilitySetup
-}; 
+};

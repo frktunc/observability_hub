@@ -1,218 +1,118 @@
 import { Request, Response, NextFunction } from 'express';
+import { Histogram, Counter, register, collectDefaultMetrics } from 'prom-client';
 
-export interface MetricsOptions {
+// Enable default metrics collection
+collectDefaultMetrics();
+
+// --- Prometheus Metrics Definitions ---
+
+/**
+ * Histogram for tracking HTTP request duration in seconds.
+ * Labels:
+ * - method: HTTP request method (e.g., GET, POST)
+ * - route: The matched route path (e.g., /api/users/:id)
+ * - status_code: HTTP status code of the response
+ */
+const httpRequestDurationSeconds = new Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code'],
+  buckets: [0.1, 0.5, 1, 1.5, 2, 5], // Buckets in seconds
+});
+
+/**
+ * Counter for tracking the total number of HTTP requests.
+ * Labels:
+ * - method: HTTP request method
+ * - route: The matched route path
+ * - status_code: HTTP status code
+ */
+const httpRequestsTotal = new Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['method', 'route', 'status_code'],
+});
+
+// --- Middleware ---
+
+export interface MetricsMiddlewareOptions {
   /**
-   * Whether to collect timing metrics
-   * @default true
-   */
-  collectTiming?: boolean;
-  
-  /**
-   * Whether to collect request count metrics
-   * @default true
-   */
-  collectRequestCount?: boolean;
-  
-  /**
-   * Whether to collect status code metrics
-   * @default true
-   */
-  collectStatusCodes?: boolean;
-  
-  /**
-   * Whether to collect route-specific metrics
+   * Whether to collect route-specific metrics.
+   * If false, 'route' label will be set to a generic value.
    * @default true
    */
   collectRouteMetrics?: boolean;
-  
+
   /**
-   * Custom metrics collector function
-   */
-  customCollector?: (metrics: MetricsData) => void;
-  
-  /**
-   * Skip metrics collection for certain paths
+   * Paths to exclude from metrics collection.
+   * @default ['/metrics', '/health']
    */
   skipPaths?: string[];
-  
-  /**
-   * Whether to log basic metrics to console
-   * @default true
-   */
-  logToConsole?: boolean;
-}
-
-export interface MetricsData {
-  method: string;
-  path: string;
-  statusCode: number;
-  duration: number;
-  timestamp: string;
-  correlationId?: string;
-  userAgent?: string;
 }
 
 /**
- * Simple in-memory metrics store
- * In production, you'd want to use Prometheus, StatsD, or similar
+ * Express middleware to collect Prometheus metrics for HTTP requests.
+ *
+ * This middleware tracks:
+ * - Total number of requests (`http_requests_total`)
+ * - Request latency (`http_request_duration_seconds`)
+ *
+ * Metrics are labeled by method, route, and status code for detailed analysis.
+ *
+ * @param options - Configuration options for the middleware.
+ * @returns An Express middleware function.
  */
-class SimpleMetricsStore {
-  private requestCount = 0;
-  private requestsByMethod: Record<string, number> = {};
-  private requestsByPath: Record<string, number> = {};
-  private requestsByStatus: Record<number, number> = {};
-  private totalDuration = 0;
-  private minDuration = Infinity;
-  private maxDuration = 0;
-
-  public recordRequest(data: MetricsData): void {
-    this.requestCount++;
-    
-    // Method metrics
-    this.requestsByMethod[data.method] = (this.requestsByMethod[data.method] || 0) + 1;
-    
-    // Path metrics
-    this.requestsByPath[data.path] = (this.requestsByPath[data.path] || 0) + 1;
-    
-    // Status code metrics
-    this.requestsByStatus[data.statusCode] = (this.requestsByStatus[data.statusCode] || 0) + 1;
-    
-    // Duration metrics
-    this.totalDuration += data.duration;
-    this.minDuration = Math.min(this.minDuration, data.duration);
-    this.maxDuration = Math.max(this.maxDuration, data.duration);
-  }
-
-  public getMetrics() {
-    return {
-      requests: {
-        total: this.requestCount,
-        byMethod: this.requestsByMethod,
-        byPath: this.requestsByPath,
-        byStatus: this.requestsByStatus
-      },
-      timing: {
-        total: this.totalDuration,
-        average: this.requestCount > 0 ? this.totalDuration / this.requestCount : 0,
-        min: this.minDuration === Infinity ? 0 : this.minDuration,
-        max: this.maxDuration
-      }
-    };
-  }
-
-  public reset(): void {
-    this.requestCount = 0;
-    this.requestsByMethod = {};
-    this.requestsByPath = {};
-    this.requestsByStatus = {};
-    this.totalDuration = 0;
-    this.minDuration = Infinity;
-    this.maxDuration = 0;
-  }
-}
-
-// Global metrics store instance
-const globalMetricsStore = new SimpleMetricsStore();
-
-/**
- * Unified metrics middleware for all microservices
- * 
- * Features:
- * - Request counting
- * - Timing metrics
- * - Status code tracking
- * - Route-specific metrics
- * - Custom metrics collection
- * - Path filtering
- * - Console logging
- * 
- * @param options Configuration options
- * @returns Express middleware function
- */
-export function metricsMiddleware(options: MetricsOptions = {}) {
+export function metricsMiddleware(options: MetricsMiddlewareOptions = {}) {
   const {
-    collectTiming = true,
-    collectRequestCount = true,
-    collectStatusCodes = true,
     collectRouteMetrics = true,
-    customCollector,
-    skipPaths = [],
-    logToConsole = true
+    skipPaths = ['/metrics', '/health'],
   } = options;
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    // Skip metrics for certain paths
+    // Skip metrics for specified paths
     if (skipPaths.includes(req.path)) {
       return next();
     }
 
-    const startTime = Date.now();
+    // Start timer to measure request duration
+    const end = httpRequestDurationSeconds.startTimer();
 
-    // Override res.end to collect metrics
-    const originalEnd = res.end;
-    res.end = function(chunk?: any, encoding?: any): any {
-      const duration = Date.now() - startTime;
-      const path = req.route?.path || req.path;
-      
-      const metricsData: MetricsData = {
+    // Capture response finish event to record metrics
+    res.on('finish', () => {
+      const route = collectRouteMetrics && req.route ? req.route.path : req.path;
+      const statusCode = res.statusCode;
+
+      // Increment request counter
+      httpRequestsTotal.inc({
         method: req.method,
-        path,
-        statusCode: res.statusCode,
-        duration,
-        timestamp: new Date().toISOString(),
-        correlationId: req.correlationId,
-        userAgent: req.get('User-Agent')
-      };
+        route,
+        status_code: statusCode,
+      });
 
-      // Collect metrics to store
-      if (collectRequestCount || collectTiming || collectStatusCodes || collectRouteMetrics) {
-        globalMetricsStore.recordRequest(metricsData);
-      }
-
-      // Custom metrics collection
-      if (customCollector) {
-        customCollector(metricsData);
-      }
-
-      // Log to console if enabled
-      if (logToConsole) {
-        console.log(`[METRICS] ${metricsData.method} ${metricsData.path} - ${metricsData.statusCode} - ${duration}ms`);
-      }
-
-      return originalEnd.call(this, chunk, encoding);
-    };
+      // End timer and record duration
+      end({
+        method: req.method,
+        route,
+        status_code: statusCode,
+      });
+    });
 
     next();
   };
 }
 
-/**
- * Get current metrics from the global store
- */
-export function getMetrics() {
-  return globalMetricsStore.getMetrics();
-}
+// --- Exports ---
 
 /**
- * Reset all metrics
- */
-export function resetMetrics(): void {
-  globalMetricsStore.reset();
-}
-
-/**
- * Default metrics middleware with standard configuration
+ * A pre-configured default metrics middleware instance.
+ * Skips `/metrics` and `/health` paths by default.
  */
 export const defaultMetrics = metricsMiddleware();
 
 /**
- * Lightweight metrics for high-traffic scenarios
+ * Function to get the underlying prom-client register.
+ * Useful for custom metric registration.
  */
-export const lightweightMetrics = metricsMiddleware({
-  collectTiming: true,
-  collectRequestCount: true,
-  collectStatusCodes: false,
-  collectRouteMetrics: false,
-  logToConsole: false,
-  skipPaths: ['/health', '/metrics']
-}); 
+export function getPrometheusRegister() {
+  return register;
+}
