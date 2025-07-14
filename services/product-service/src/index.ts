@@ -86,7 +86,10 @@ async function startServer() {
     await db.connect();
     console.log('✅ Database connected and schema initialized');
 
-    const server = app.listen(config.PORT, config.HOST, () => {
+    const server = app.listen(config.PORT, config.HOST, async () => {
+      // Connect logger first
+     // await logger.connect();
+
       logger.info(`🚀 Product Service is running on port ${config.PORT}`);
       logger.info(`📊 Health check: ${derivedConfig.httpUrl}/health`);
       logger.info(`📈 Metrics: ${derivedConfig.httpUrl}/metrics`);

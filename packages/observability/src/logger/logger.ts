@@ -62,13 +62,10 @@ export class ObservabilityLogger {
       connectionStatus: 'disconnected',
       averagePublishTime: 0,
     };
-
-    // Auto-connect
-    this.connect().catch(console.error);
   }
 
   // Connection management
-  private async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     try {
       const {
         rabbitmqHostname,
