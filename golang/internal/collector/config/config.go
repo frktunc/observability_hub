@@ -29,6 +29,8 @@ type Config struct {
 	RedisMinIdle    int
 	RedisMaxRetries int
 	RedisTTL        time.Duration
+	// Elasticsearch Configuration
+	ElasticsearchURL string
 }
 
 // Load reads configuration from environment variables and returns a new Config struct.
@@ -104,6 +106,8 @@ func Load() (*Config, error) {
 		RedisMinIdle:    redisMinIdle,
 		RedisMaxRetries: redisMaxRetries,
 		RedisTTL:        redisTTL,
+		// Elasticsearch Configuration
+		ElasticsearchURL: getEnv("ELASTICSEARCH_URL", "http://localhost:9200"),
 	}
 	return cfg, nil
 }

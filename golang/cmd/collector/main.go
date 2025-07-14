@@ -64,6 +64,12 @@ func main() {
 	}
 	defer dbStorage.Close()
 
+	esStorage, err := storage.NewESStorage(cfg, logger)
+	if err != nil {
+		logger.Fatal("Failed to create Elasticsearch storage", zap.Error(err))
+	}
+	defer esStorage.Close()
+
 	rmqConsumer, err := consumer.New(cfg)
 	if err != nil {
 		logger.Fatal("Failed to create RabbitMQ consumer", zap.Error(err))
@@ -102,6 +108,15 @@ func main() {
 					}
 
 					dbStorage.AddToBatch(&event)
+
+					// Asynchronously send to Elasticsearch
+					go func(e storage.LogEvent) {
+						if err := esStorage.BulkIndexLogEvents(ctx, []*storage.LogEvent{&e}); err != nil {
+							logger.Error("Failed to index log event to Elasticsearch", zap.Error(err), zap.String("eventId", e.EventID))
+							// Here you might want to add metrics for ES failures
+						}
+					}(event)
+
 					d.Ack(false)
 					metrics.MessagesAcked.Inc()
 				}
