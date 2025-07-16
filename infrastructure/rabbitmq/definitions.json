@@ -436,6 +436,14 @@
       "destination_type": "queue",
       "routing_key": "",
       "arguments": {}
+    },
+    {
+      "source": "logs.topic",
+      "vhost": "/",
+      "destination": "log_events",
+      "destination_type": "queue",
+      "routing_key": "logs.*",
+      "arguments": {}
     }
   ]
-} 
+}

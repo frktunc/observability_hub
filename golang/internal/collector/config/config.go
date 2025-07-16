@@ -12,6 +12,7 @@ type Config struct {
 	RabbitMQURL     string
 	PostgresURL     string
 	QueueName       string
+	ExchangeName    string
 	DLXName         string
 	DLQName         string
 	BatchSize       int
@@ -89,6 +90,7 @@ func Load() (*Config, error) {
 		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://obs_user:obs_password@obs_rabbitmq:5672/"),
 		PostgresURL:     getEnv("POSTGRES_URL", "postgres://user:password@localhost:5432/logs?sslmode=disable"),
 		QueueName:       getEnv("RABBITMQ_QUEUE_NAME", "log_events"),
+		ExchangeName:    getEnv("RABBITMQ_EXCHANGE", "logs.topic"),
 		DLXName:         getEnv("RABBITMQ_DLX_NAME", "log_events_dlx"),
 		DLQName:         getEnv("RABBITMQ_DLQ_NAME", "log_events_dlq"),
 		MetricsPort:     getEnv("METRICS_PORT", "9090"),

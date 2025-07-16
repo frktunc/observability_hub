@@ -28,6 +28,20 @@ func New(cfg *config.Config) (*Consumer, error) {
 		return nil, fmt.Errorf("failed to open a channel: %w", err)
 	}
 
+	// Declare the main exchange (topic)
+	err = ch.ExchangeDeclare(
+		cfg.ExchangeName, // name
+		"topic",          // type
+		true,             // durable
+		false,            // auto-deleted
+		false,            // internal
+		false,            // no-wait
+		nil,              // arguments
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to declare main exchange: %w", err)
+	}
+
 	// Declare the Dead Letter Exchange
 	err = ch.ExchangeDeclare(
 		cfg.DLXName, // name
@@ -81,6 +95,18 @@ func New(cfg *config.Config) (*Consumer, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to declare main queue: %w", err)
+	}
+
+	// Bind the main queue to the main exchange with logs.* routing key
+	err = ch.QueueBind(
+		cfg.QueueName,    // queue name
+		"logs.*",         // routing key
+		cfg.ExchangeName, // exchange
+		false,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind main queue to exchange: %w", err)
 	}
 
 	return &Consumer{
