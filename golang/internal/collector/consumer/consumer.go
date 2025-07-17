@@ -100,7 +100,7 @@ func New(cfg *config.Config) (*Consumer, error) {
 	// Bind the main queue to the main exchange with logs.* routing key
 	err = ch.QueueBind(
 		cfg.QueueName,    // queue name
-		"logs.*",         // routing key
+		"logs.#",         // routing key
 		cfg.ExchangeName, // exchange
 		false,
 		nil,

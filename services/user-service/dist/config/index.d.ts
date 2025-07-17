@@ -1,5 +1,5 @@
 export declare const config: {
-    NODE_ENV: "development" | "staging" | "production";
+    NODE_ENV: "production" | "development" | "staging";
     PORT: number;
     HOST: string;
     SERVICE_NAME: string;
@@ -39,6 +39,8 @@ export declare const config: {
     METRICS_ENABLED: boolean;
     METRICS_PORT: number;
     METRICS_PATH: string;
+    JAEGER_ENABLED: boolean;
+    OTEL_EXPORTER_OTLP_ENDPOINT: string;
     HEALTH_CHECK_ENABLED: boolean;
     HEALTH_CHECK_PATH: string;
     HEALTH_CHECK_TIMEOUT: number;

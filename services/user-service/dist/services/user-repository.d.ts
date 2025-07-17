@@ -1,38 +1,25 @@
-export interface User extends Record<string, unknown> {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    country?: string;
-    createdAt: string;
-    updatedAt?: string;
-}
+import { User } from '@/types/user';
 export interface CreateUserRequest {
     name: string;
     email: string;
-    role?: string;
+    role?: 'user' | 'admin' | 'moderator';
     country?: string;
 }
 export interface UpdateUserRequest {
     name?: string;
     email?: string;
-    role?: string;
+    role?: 'user' | 'admin' | 'moderator';
     country?: string;
 }
 export declare class UserRepository {
-    getAllUsers(): Promise<User[]>;
-    getUserById(id: string): Promise<User | null>;
-    getUserByEmail(email: string): Promise<User | null>;
-    createUser(userData: CreateUserRequest): Promise<User>;
-    updateUser(id: string, userData: UpdateUserRequest): Promise<User | null>;
-    deleteUser(id: string): Promise<boolean>;
-    getUsersCount(): Promise<number>;
-    getUsersByRole(role: string): Promise<User[]>;
-    getUsersByCountry(country: string): Promise<User[]>;
-    getCountryStats(): Promise<Array<{
-        country: string;
-        userCount: number;
-    }>>;
+    private logger;
+    constructor();
+    findAll(): Promise<User[]>;
+    findById(id: string): Promise<User | null>;
+    findByEmail(email: string): Promise<User | null>;
+    create(userData: CreateUserRequest): Promise<User>;
+    update(id: string, userData: UpdateUserRequest): Promise<User | null>;
+    delete(id: string): Promise<boolean>;
 }
 export declare const userRepository: UserRepository;
 //# sourceMappingURL=user-repository.d.ts.map
