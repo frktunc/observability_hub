@@ -5,7 +5,6 @@ import compression from 'compression';
 import { config, derivedConfig } from '../config';
 import { 
   defaultCorrelationIdMiddleware,
-  defaultErrorHandler,
   requestLoggingMiddleware,
   metricsMiddleware
 } from '@observability-hub/observability/middleware';
@@ -17,10 +16,11 @@ export function applyGlobalMiddleware(app: Application) {
 
   // Security middleware
   app.use(helmet({
+    // Tarayıcının sadece belirli kaynaklara erişmesini sağlar.
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        defaultSrc: ["'self'"], // Sadece kendi kaynaklara erişim
+        styleSrc: ["'self'", "'unsafe-inline'"], // CSS'lerin kendi kaynaklardan yüklenmesini sağlar
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -36,8 +36,10 @@ export function applyGlobalMiddleware(app: Application) {
   }));
 
   // Compression middleware
+  // Gereksiz veri işlemeyi önler ve performansı artırır.
   if (config.FEATURE_COMPRESSION) {
     app.use(compression({
+        // Orta seviyede sıkıştırma.
       level: 6,
       threshold: 1024,
       filter: (req, res) => {
@@ -50,6 +52,7 @@ export function applyGlobalMiddleware(app: Application) {
   }
 
   // Body parsing middleware
+  // JSON ve form verilerini request body’den okuyabilmek için. limit ile maksimum veri boyutu sınırlandırılmış.
   app.use(require('express').json({ 
     limit: '10mb'
   }));

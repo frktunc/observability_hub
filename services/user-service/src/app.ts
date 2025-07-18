@@ -3,7 +3,6 @@ import { applyGlobalMiddleware } from '@/bootstrap/global-middleware';
 import { applyRoutes } from '@/bootstrap/routes';
 import { applyDocsEndpoint } from '@/bootstrap/docs';
 import { defaultErrorHandler } from '@observability-hub/observability/middleware';
-import { config } from '@/config';
 
 export function createApp(): express.Application {
   const app = express();
@@ -27,11 +26,11 @@ export function createApp(): express.Application {
 declare global {
   namespace Express {
     interface Request {
-      correlationId?: string;
-      requestId?: string;
-      tenantId?: string;
-      startTime?: number;
-      rawBody?: Buffer;
+      correlationId?: string; // 	Her isteğe özel benzersiz ID; log takibi, tracing
+      requestId?: string; // Genellikle proxy veya API Gateway’lerden gelen ID
+      tenantId?: string; // 	Kullanıcının ait olduğu kurum/şirket ID'si
+      startTime?: number; // 	İstek başlangıç zamanı
+      rawBody?: Buffer; // 	Raw body verisi
     }
   }
 }

@@ -4,10 +4,41 @@ import { db } from '../services/database';
 import { getRedisClient } from '../services/redis-client';
 import { rateLimitHealthCheck } from '../middleware/rate-limiting';
 import { config } from '../config';
+import amqplib from 'amqplib';
 
 const router = Router();
 
-// Create health check handler using observability package
+/**
+ * RabbitMQ bağlantı sağlığını kontrol eder.
+ */
+async function checkRabbitMQ(): Promise<{ status: 'connected' | 'error'; latency?: number; error?: string }> {
+  const start = Date.now();
+  try {
+    const connection = await amqplib.connect(config.RABBITMQ_URL, {
+      timeout: config.RABBITMQ_CONNECTION_TIMEOUT,
+      heartbeat: config.RABBITMQ_HEARTBEAT,
+    });
+    await connection.close();
+    return { status: 'connected', latency: Date.now() - start };
+  } catch (error: any) {
+    return { status: 'error', error: error?.message || 'Unknown error' };
+  }
+}
+
+/**
+ * Health durumunu değerlendirir.
+ */
+function evaluateStatus(baseStatus: string, rabbitStatus: string): 'healthy' | 'degraded' | 'unhealthy' {
+  if (rabbitStatus === 'error') {
+    if (baseStatus === 'healthy') return 'degraded';
+    if (baseStatus === 'degraded') return 'unhealthy';
+  }
+  return baseStatus as 'healthy' | 'degraded' | 'unhealthy';
+}
+
+/**
+ * Health check handler oluştur
+ */
 const healthCheckHandler = createHealthCheckHandler(
   config.SERVICE_NAME,
   config.SERVICE_VERSION,
@@ -20,7 +51,7 @@ const healthCheckHandler = createHealthCheckHandler(
         return {
           status: result.status === 'connected' ? 'connected' : 'error',
           latency: result.latency,
-          error: result.error
+          error: result.error,
         };
       }
     },
@@ -36,15 +67,26 @@ const healthCheckHandler = createHealthCheckHandler(
   }
 );
 
+/**
+ * GET /health endpoint
+ */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const healthResult = await healthCheckHandler();
-    
-    // Return appropriate status code based on health
-    const statusCode = healthResult.status === 'healthy' ? 200 : 
-                      healthResult.status === 'degraded' ? 200 : 503;
-    
-    res.status(statusCode).json(healthResult);
+    const [baseHealth, rabbitHealth] = await Promise.all([
+      healthCheckHandler(),
+      checkRabbitMQ()
+    ]);
+
+    baseHealth.dependencies = {
+      ...baseHealth.dependencies,
+      rabbitmq: rabbitHealth,
+    };
+
+    baseHealth.status = evaluateStatus(baseHealth.status, rabbitHealth.status);
+
+    const statusCode = baseHealth.status === 'unhealthy' ? 503 : 200;
+    res.status(statusCode).json(baseHealth);
+
   } catch (error) {
     res.status(503).json({
       status: 'unhealthy',
@@ -57,4 +99,4 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-export { router as healthRoutes }; 
+export { router as healthRoutes };

@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 
+/**
+ * Hata yanıtı biçimi
+ */
 export interface ErrorResponse {
   error: {
     message: string;
@@ -10,70 +13,69 @@ export interface ErrorResponse {
   };
 }
 
+/**
+ * Hata yakalayıcı yapılandırma seçenekleri
+ */
 export interface ErrorHandlerOptions {
   /**
-   * Whether to include stack trace in development
-   * @default true in development, false in production
+   * Geliştirme ortamında stack trace dahil edilsin mi?
+   * @default development'ta true, production'da false
    */
   includeStackTrace?: boolean;
-  
+
   /**
-   * Whether to log errors to console
+   * Hatalar konsola yazılsın mı?
    * @default true
    */
   logErrors?: boolean;
-  
+
   /**
-   * Custom error logger function
+   * Özel hata günlüğü fonksiyonu
    */
   customLogger?: (error: Error, req: Request) => void;
-  
+
   /**
-   * Custom error status code mapping
+   * Özel hata adı - HTTP status kodu eşleşmesi
    */
   statusCodeMapping?: Record<string, number>;
-  
+
   /**
-   * Whether to include detailed error information
-   * @default false in production
+   * Hata detayları yanıta dahil edilsin mi?
+   * @default production'da false
    */
   includeDetails?: boolean;
 }
 
 /**
- * Standard error status code mapping
+ * Varsayılan hata adı - HTTP durum kodu eşlemeleri
  */
 const defaultStatusCodeMapping: Record<string, number> = {
-  'ValidationError': 400,
-  'CastError': 400,
-  'NotFoundError': 404,
-  'UnauthorizedError': 401,
-  'ForbiddenError': 403,
-  'ConflictError': 409,
-  'TooManyRequestsError': 429,
-  'TimeoutError': 408,
-  'PayloadTooLargeError': 413,
-  'UnsupportedMediaTypeError': 415,
-  'UnprocessableEntityError': 422,
-  'InternalServerError': 500,
-  'NotImplementedError': 501,
-  'BadGatewayError': 502,
-  'ServiceUnavailableError': 503,
-  'GatewayTimeoutError': 504
+  ValidationError: 400,
+  CastError: 400,
+  NotFoundError: 404,
+  UnauthorizedError: 401,
+  ForbiddenError: 403,
+  ConflictError: 409,
+  TooManyRequestsError: 429,
+  TimeoutError: 408,
+  PayloadTooLargeError: 413,
+  UnsupportedMediaTypeError: 415,
+  UnprocessableEntityError: 422,
+  InternalServerError: 500,
+  NotImplementedError: 501,
+  BadGatewayError: 502,
+  ServiceUnavailableError: 503,
+  GatewayTimeoutError: 504,
 };
 
 /**
- * Unified error handler middleware for all microservices
+ * Tüm mikroservisler için birleşik hata yakalayıcı middleware
  * 
- * Features:
- * - Consistent error response format
- * - Correlation ID tracking
- * - Configurable error mapping
- * - Environment-aware error details
- * - Custom logging support
- * 
- * @param options Configuration options
- * @returns Express error handler middleware
+ * Özellikler:
+ * - Tutarlı hata yanıt formatı
+ * - Correlation ID desteği
+ * - Ortama göre detay kontrolü
+ * - Özelleştirilebilir log ve status mapping
  */
 export function errorHandlerMiddleware(options: ErrorHandlerOptions = {}) {
   const {
@@ -84,57 +86,55 @@ export function errorHandlerMiddleware(options: ErrorHandlerOptions = {}) {
     includeDetails = process.env.NODE_ENV !== 'production'
   } = options;
 
-  const combinedStatusMapping = { ...defaultStatusCodeMapping, ...statusCodeMapping };
+  const statusCodes = { ...defaultStatusCodeMapping, ...statusCodeMapping };
 
   return (error: Error, req: Request, res: Response, _next: NextFunction): void => {
-    // Get correlation ID from request
     const correlationId = req.correlationId || 'unknown';
-    
-    // Log error if enabled
+    const timestamp = new Date().toISOString();
+    const statusCode = statusCodes[error.name] || 500;
+
+    // Hataları logla
     if (logErrors) {
       if (customLogger) {
         customLogger(error, req);
       } else {
-        console.error(`[${correlationId}] Error in ${req.method} ${req.path}:`, {
+        console.error(`[${correlationId}] ${req.method} ${req.path}`, {
           name: error.name,
           message: error.message,
           stack: includeStackTrace ? error.stack : undefined,
           correlationId,
-          timestamp: new Date().toISOString()
+          timestamp
         });
       }
     }
-    
-    // Determine status code
-    const statusCode = combinedStatusMapping[error.name] || 500;
-    
-    // Build error response
+
+    // Hata yanıtı oluştur
     const errorResponse: ErrorResponse = {
       error: {
         message: error.message || 'Internal Server Error',
         type: error.name || 'Error',
         correlationId,
-        timestamp: new Date().toISOString()
+        timestamp
       }
     };
-    
-    // Add details in development/debug mode
+
+    // Geliştirme ortamında detay ekle
     if (includeDetails) {
       errorResponse.error.details = {
-        stack: includeStackTrace ? error.stack : undefined,
-        path: req.path,
         method: req.method,
-        statusCode
+        path: req.path,
+        statusCode,
+        stack: includeStackTrace ? error.stack : undefined
       };
     }
-    
-    // Send error response
+
+    // JSON hata yanıtı döndür
     res.status(statusCode).json(errorResponse);
   };
 }
 
 /**
- * Default error handler with standard configuration
- * Use this for most common use cases
+ * Varsayılan hata yakalayıcı
+ * Genellikle bu kullanılabilir
  */
-export const defaultErrorHandler = errorHandlerMiddleware(); 
+export const defaultErrorHandler = errorHandlerMiddleware();

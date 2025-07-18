@@ -1,4 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
+/**
+ * Hata yanıtı biçimi
+ */
 export interface ErrorResponse {
     error: {
         message: string;
@@ -8,48 +11,47 @@ export interface ErrorResponse {
         details?: any;
     };
 }
+/**
+ * Hata yakalayıcı yapılandırma seçenekleri
+ */
 export interface ErrorHandlerOptions {
     /**
-     * Whether to include stack trace in development
-     * @default true in development, false in production
+     * Geliştirme ortamında stack trace dahil edilsin mi?
+     * @default development'ta true, production'da false
      */
     includeStackTrace?: boolean;
     /**
-     * Whether to log errors to console
+     * Hatalar konsola yazılsın mı?
      * @default true
      */
     logErrors?: boolean;
     /**
-     * Custom error logger function
+     * Özel hata günlüğü fonksiyonu
      */
     customLogger?: (error: Error, req: Request) => void;
     /**
-     * Custom error status code mapping
+     * Özel hata adı - HTTP status kodu eşleşmesi
      */
     statusCodeMapping?: Record<string, number>;
     /**
-     * Whether to include detailed error information
-     * @default false in production
+     * Hata detayları yanıta dahil edilsin mi?
+     * @default production'da false
      */
     includeDetails?: boolean;
 }
 /**
- * Unified error handler middleware for all microservices
+ * Tüm mikroservisler için birleşik hata yakalayıcı middleware
  *
- * Features:
- * - Consistent error response format
- * - Correlation ID tracking
- * - Configurable error mapping
- * - Environment-aware error details
- * - Custom logging support
- *
- * @param options Configuration options
- * @returns Express error handler middleware
+ * Özellikler:
+ * - Tutarlı hata yanıt formatı
+ * - Correlation ID desteği
+ * - Ortama göre detay kontrolü
+ * - Özelleştirilebilir log ve status mapping
  */
 export declare function errorHandlerMiddleware(options?: ErrorHandlerOptions): (error: Error, req: Request, res: Response, _next: NextFunction) => void;
 /**
- * Default error handler with standard configuration
- * Use this for most common use cases
+ * Varsayılan hata yakalayıcı
+ * Genellikle bu kullanılabilir
  */
 export declare const defaultErrorHandler: (error: Error, req: Request, res: Response, _next: NextFunction) => void;
 //# sourceMappingURL=error-handler.d.ts.map
