@@ -1,5 +1,6 @@
 import { createRedisService } from '@observability-hub/observability/redis';
 import { derivedConfig } from '../config';
+import { logger } from '../bootstrap/logger';
 
 // Transform config to match observability RedisConfig interface
 const redisConfig = {
@@ -14,7 +15,7 @@ const redisConfig = {
 };
 
 // Use observability package's Redis utilities
-const redisService = createRedisService(redisConfig, 'user-service');
+const redisService = createRedisService(redisConfig, 'user-service', logger);
 
 export const {
   getRedisClient,

@@ -3,87 +3,82 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.defaultErrorHandler = void 0;
 exports.errorHandlerMiddleware = errorHandlerMiddleware;
 /**
- * Standard error status code mapping
+ * Varsayılan hata adı - HTTP durum kodu eşlemeleri
  */
 const defaultStatusCodeMapping = {
-    'ValidationError': 400,
-    'CastError': 400,
-    'NotFoundError': 404,
-    'UnauthorizedError': 401,
-    'ForbiddenError': 403,
-    'ConflictError': 409,
-    'TooManyRequestsError': 429,
-    'TimeoutError': 408,
-    'PayloadTooLargeError': 413,
-    'UnsupportedMediaTypeError': 415,
-    'UnprocessableEntityError': 422,
-    'InternalServerError': 500,
-    'NotImplementedError': 501,
-    'BadGatewayError': 502,
-    'ServiceUnavailableError': 503,
-    'GatewayTimeoutError': 504
+    ValidationError: 400,
+    CastError: 400,
+    NotFoundError: 404,
+    UnauthorizedError: 401,
+    ForbiddenError: 403,
+    ConflictError: 409,
+    TooManyRequestsError: 429,
+    TimeoutError: 408,
+    PayloadTooLargeError: 413,
+    UnsupportedMediaTypeError: 415,
+    UnprocessableEntityError: 422,
+    InternalServerError: 500,
+    NotImplementedError: 501,
+    BadGatewayError: 502,
+    ServiceUnavailableError: 503,
+    GatewayTimeoutError: 504,
 };
 /**
- * Unified error handler middleware for all microservices
+ * Tüm mikroservisler için birleşik hata yakalayıcı middleware
  *
- * Features:
- * - Consistent error response format
- * - Correlation ID tracking
- * - Configurable error mapping
- * - Environment-aware error details
- * - Custom logging support
- *
- * @param options Configuration options
- * @returns Express error handler middleware
+ * Özellikler:
+ * - Tutarlı hata yanıt formatı
+ * - Correlation ID desteği
+ * - Ortama göre detay kontrolü
+ * - Özelleştirilebilir log ve status mapping
  */
 function errorHandlerMiddleware(options = {}) {
     const { includeStackTrace = process.env.NODE_ENV === 'development', logErrors = true, customLogger, statusCodeMapping = {}, includeDetails = process.env.NODE_ENV !== 'production' } = options;
-    const combinedStatusMapping = { ...defaultStatusCodeMapping, ...statusCodeMapping };
+    const statusCodes = { ...defaultStatusCodeMapping, ...statusCodeMapping };
     return (error, req, res, _next) => {
-        // Get correlation ID from request
         const correlationId = req.correlationId || 'unknown';
-        // Log error if enabled
+        const timestamp = new Date().toISOString();
+        const statusCode = statusCodes[error.name] || 500;
+        // Hataları logla
         if (logErrors) {
             if (customLogger) {
                 customLogger(error, req);
             }
             else {
-                console.error(`[${correlationId}] Error in ${req.method} ${req.path}:`, {
+                console.error(`[${correlationId}] ${req.method} ${req.path}`, {
                     name: error.name,
                     message: error.message,
                     stack: includeStackTrace ? error.stack : undefined,
                     correlationId,
-                    timestamp: new Date().toISOString()
+                    timestamp
                 });
             }
         }
-        // Determine status code
-        const statusCode = combinedStatusMapping[error.name] || 500;
-        // Build error response
+        // Hata yanıtı oluştur
         const errorResponse = {
             error: {
                 message: error.message || 'Internal Server Error',
                 type: error.name || 'Error',
                 correlationId,
-                timestamp: new Date().toISOString()
+                timestamp
             }
         };
-        // Add details in development/debug mode
+        // Geliştirme ortamında detay ekle
         if (includeDetails) {
             errorResponse.error.details = {
-                stack: includeStackTrace ? error.stack : undefined,
-                path: req.path,
                 method: req.method,
-                statusCode
+                path: req.path,
+                statusCode,
+                stack: includeStackTrace ? error.stack : undefined
             };
         }
-        // Send error response
+        // JSON hata yanıtı döndür
         res.status(statusCode).json(errorResponse);
     };
 }
 /**
- * Default error handler with standard configuration
- * Use this for most common use cases
+ * Varsayılan hata yakalayıcı
+ * Genellikle bu kullanılabilir
  */
 exports.defaultErrorHandler = errorHandlerMiddleware();
 //# sourceMappingURL=error-handler.js.map
