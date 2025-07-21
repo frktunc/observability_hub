@@ -2,7 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logger = void 0;
 const observability_1 = require("@observability-hub/observability");
-const config_1 = require("../config");
+const config_1 = require("@/config");
+// Create a single, shared logger instance for the entire service
 exports.logger = new observability_1.ObservabilityLogger({
     serviceName: config_1.config.SERVICE_NAME,
     serviceVersion: config_1.config.SERVICE_VERSION,

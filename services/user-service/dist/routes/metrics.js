@@ -5,24 +5,6 @@ const express_1 = require("express");
 const prom_client_1 = require("prom-client");
 const router = (0, express_1.Router)();
 exports.metricsRoutes = router;
-/**
- * @swagger
- * /metrics:
- *   get:
- *     summary: Get Prometheus metrics
- *     description: Returns application metrics in Prometheus format.
- *     tags:
- *       - Monitoring
- *     responses:
- *       200:
- *         description: Metrics in Prometheus format.
- *         content:
- *           text/plain:
- *             schema:
- *               type: string
- *       500:
- *         description: Failed to retrieve metrics.
- */
 router.get('/', async (req, res) => {
     try {
         res.set('Content-Type', prom_client_1.register.contentType);

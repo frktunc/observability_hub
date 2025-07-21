@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ObservabilityLogger } from '@observability-hub/observability';
 import { db } from '@/services/database';
-import { config } from '@/config';
+import { logger } from '@/bootstrap/logger';
 import { User } from '@/types/user';
 
 export interface CreateUserRequest {
@@ -19,56 +18,45 @@ export interface UpdateUserRequest {
 }
 
 export class UserRepository {
-  private logger: ObservabilityLogger;
-
-  constructor() {
-    this.logger = new ObservabilityLogger({
-      serviceName: config.SERVICE_NAME,
-      serviceVersion: config.SERVICE_VERSION,
-      environment: config.NODE_ENV,
-      defaultLogLevel: config.LOG_LEVEL as any,
-    });
-  }
-
   async findAll(): Promise<User[]> {
     try {
-      this.logger.debug('Fetching all users', { operation: 'findAll' });
+      logger.debug('Fetching all users', { operation: 'findAll' });
       const result = await db.query(
         'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users ORDER BY created_at DESC'
       );
-      this.logger.info('Successfully fetched all users', { 
+      logger.info('Successfully fetched all users', { 
         operation: 'findAll',
         count: result.rows.length 
       });
       return result.rows;
     } catch (error) {
-      this.logger.error('Failed to fetch users', error as Error, { operation: 'findAll' });
+      logger.error('Failed to fetch users', error as Error, { operation: 'findAll' });
       throw new Error('Failed to fetch users');
     }
   }
 
   async findById(id: string): Promise<User | null> {
     try {
-      this.logger.debug('Fetching user by ID', { operation: 'findById', userId: id });
+      logger.debug('Fetching user by ID', { operation: 'findById', userId: id });
       const result = await db.query(
         'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE id = $1',
         [id]
       );
       const user = result.rows[0] || null;
       if (user) {
-        this.logger.info('Successfully fetched user by ID', { 
+        logger.info('Successfully fetched user by ID', { 
           operation: 'findById', 
           userId: id 
         });
       } else {
-        this.logger.warn('User not found by ID', { 
+        logger.warn('User not found by ID', { 
           operation: 'findById', 
           userId: id 
         });
       }
       return user;
     } catch (error) {
-      this.logger.error('Failed to fetch user by ID', error as Error, { 
+      logger.error('Failed to fetch user by ID', error as Error, { 
         operation: 'findById', 
         userId: id 
       });
@@ -78,26 +66,26 @@ export class UserRepository {
 
   async findByEmail(email: string): Promise<User | null> {
     try {
-      this.logger.debug('Fetching user by email', { operation: 'findByEmail', email });
+      logger.debug('Fetching user by email', { operation: 'findByEmail', email });
       const result = await db.query(
         'SELECT id, name, email, role, country, created_at as "createdAt", updated_at as "updatedAt" FROM users WHERE email = $1',
         [email]
       );
       const user = result.rows[0] || null;
       if (user) {
-        this.logger.info('Successfully fetched user by email', { 
+        logger.info('Successfully fetched user by email', { 
           operation: 'findByEmail', 
           email 
         });
       } else {
-        this.logger.debug('User not found by email', { 
+        logger.debug('User not found by email', { 
           operation: 'findByEmail', 
           email 
         });
       }
       return user;
     } catch (error) {
-      this.logger.error('Failed to fetch user by email', error as Error, { 
+      logger.error('Failed to fetch user by email', error as Error, { 
         operation: 'findByEmail', 
         email 
       });
@@ -107,7 +95,7 @@ export class UserRepository {
 
   async create(userData: CreateUserRequest): Promise<User> {
     try {
-      this.logger.info('Creating new user', { 
+      logger.info('Creating new user', { 
         operation: 'create', 
         email: userData.email,
         role: userData.role || 'user'
@@ -120,7 +108,7 @@ export class UserRepository {
         [id, userData.name, userData.email, role, country]
       );
       const newUser = result.rows[0];
-      this.logger.businessEvent({
+      logger.businessEvent({
         eventType: 'user.created',
         aggregateId: newUser.id,
         aggregateType: 'User',
@@ -129,14 +117,14 @@ export class UserRepository {
         timestamp: new Date().toISOString(),
         data: newUser,
       });
-      this.logger.info('Successfully created user', { 
+      logger.info('Successfully created user', { 
         operation: 'create', 
         userId: newUser.id,
         email: newUser.email 
       });
       return newUser;
     } catch (error: any) {
-      this.logger.error('Failed to create user', error as Error, { 
+      logger.error('Failed to create user', error as Error, { 
         operation: 'create', 
         email: userData.email 
       });
@@ -149,7 +137,7 @@ export class UserRepository {
 
   async update(id: string, userData: UpdateUserRequest): Promise<User | null> {
     try {
-      this.logger.info('Updating user', { 
+      logger.info('Updating user', { 
         operation: 'update', 
         userId: id,
         updateFields: Object.keys(userData)
@@ -189,7 +177,7 @@ export class UserRepository {
       const result = await db.query(query, values);
       const updatedUser = result.rows[0] || null;
       if (updatedUser) {
-        this.logger.businessEvent({
+        logger.businessEvent({
           eventType: 'user.updated',
           aggregateId: updatedUser.id,
           aggregateType: 'User',
@@ -198,19 +186,19 @@ export class UserRepository {
           timestamp: new Date().toISOString(),
           data: updatedUser,
         });
-        this.logger.info('Successfully updated user', { 
+        logger.info('Successfully updated user', { 
           operation: 'update', 
           userId: id 
         });
       } else {
-        this.logger.warn('User not found for update', { 
+        logger.warn('User not found for update', { 
           operation: 'update', 
           userId: id 
         });
       }
       return updatedUser;
     } catch (error: any) {
-      this.logger.error('Failed to update user', error as Error, { 
+      logger.error('Failed to update user', error as Error, { 
         operation: 'update', 
         userId: id 
       });
@@ -223,11 +211,11 @@ export class UserRepository {
 
   async delete(id: string): Promise<boolean> {
     try {
-      this.logger.info('Deleting user', { operation: 'delete', userId: id });
+      logger.info('Deleting user', { operation: 'delete', userId: id });
       const result = await db.query('DELETE FROM users WHERE id = $1', [id]);
       const deleted = result.rowCount > 0;
       if (deleted) {
-        this.logger.businessEvent({
+        logger.businessEvent({
           eventType: 'user.deleted',
           aggregateId: id,
           aggregateType: 'User',
@@ -236,19 +224,19 @@ export class UserRepository {
           timestamp: new Date().toISOString(),
           data: { userId: id },
         });
-        this.logger.info('Successfully deleted user', { 
+        logger.info('Successfully deleted user', { 
           operation: 'delete', 
           userId: id 
         });
       } else {
-        this.logger.warn('User not found for deletion', { 
+        logger.warn('User not found for deletion', { 
           operation: 'delete', 
           userId: id 
         });
       }
       return deleted;
     } catch (error) {
-      this.logger.error('Failed to delete user', error as Error, { 
+      logger.error('Failed to delete user', error as Error, { 
         operation: 'delete', 
         userId: id 
       });

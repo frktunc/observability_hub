@@ -4,25 +4,26 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.applyGlobalMiddleware = applyGlobalMiddleware;
-const helmet_1 = __importDefault(require("helmet"));
 const cors_1 = __importDefault(require("cors"));
 const compression_1 = __importDefault(require("compression"));
 const config_1 = require("../config");
 const middleware_1 = require("@observability-hub/observability/middleware");
 const rate_limiting_1 = require("../middleware/rate-limiting");
+const logger_1 = require("./logger");
 function applyGlobalMiddleware(app) {
     // Trust proxy for accurate client IPs
     app.set('trust proxy', 1);
     // Security middleware
-    app.use((0, helmet_1.default)({
-        contentSecurityPolicy: {
-            directives: {
-                defaultSrc: ["'self'"],
-                styleSrc: ["'self'", "'unsafe-inline'"],
-            },
-        },
-        crossOriginEmbedderPolicy: false,
-    }));
+    // app.use(helmet({
+    //   // Tarayıcının sadece belirli kaynaklara erişmesini sağlar.
+    //   contentSecurityPolicy: {
+    //     directives: {
+    //       defaultSrc: ["'self'"], // Sadece kendi kaynaklara erişim
+    //       styleSrc: ["'self'", "'unsafe-inline'"], // CSS'lerin kendi kaynaklardan yüklenmesini sağlar
+    //     },
+    //   },
+    //   crossOriginEmbedderPolicy: false,
+    // }));
     // CORS configuration
     app.use((0, cors_1.default)({
         origin: process.env.NODE_ENV === 'production'
@@ -32,8 +33,10 @@ function applyGlobalMiddleware(app) {
         maxAge: 86400, // 24 hours
     }));
     // Compression middleware
+    // Gereksiz veri işlemeyi önler ve performansı artırır.
     if (config_1.config.FEATURE_COMPRESSION) {
         app.use((0, compression_1.default)({
+            // Orta seviyede sıkıştırma.
             level: 6,
             threshold: 1024,
             filter: (req, res) => {
@@ -45,6 +48,7 @@ function applyGlobalMiddleware(app) {
         }));
     }
     // Body parsing middleware
+    // JSON ve form verilerini request body’den okuyabilmek için. limit ile maksimum veri boyutu sınırlandırılmış.
     app.use(require('express').json({
         limit: '10mb'
     }));
@@ -61,8 +65,12 @@ function applyGlobalMiddleware(app) {
     app.use(middleware_1.defaultCorrelationIdMiddleware);
     app.use((0, middleware_1.requestLoggingMiddleware)({
         customLogger: (level, message, metadata) => {
-            console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
-        }
+            const logMethod = logger_1.logger[level];
+            if (typeof logMethod === 'function') {
+                logMethod(message, metadata);
+            }
+        },
+        skipPaths: ['/health', '/metrics']
     }));
     // Metrics middleware
     if (config_1.config.METRICS_ENABLED) {

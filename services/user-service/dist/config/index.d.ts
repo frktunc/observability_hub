@@ -1,5 +1,5 @@
 export declare const config: {
-    NODE_ENV: "production" | "development" | "staging";
+    NODE_ENV: "development" | "staging" | "production";
     PORT: number;
     HOST: string;
     SERVICE_NAME: string;

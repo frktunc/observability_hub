@@ -9,22 +9,23 @@ import {
   metricsMiddleware
 } from '@observability-hub/observability/middleware';
 import { createRateLimitMiddleware } from '../middleware/rate-limiting';
+import { logger } from './logger';
 
 export function applyGlobalMiddleware(app: Application) {
   // Trust proxy for accurate client IPs
   app.set('trust proxy', 1);
 
   // Security middleware
-  app.use(helmet({
-    // Tarayıcının sadece belirli kaynaklara erişmesini sağlar.
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"], // Sadece kendi kaynaklara erişim
-        styleSrc: ["'self'", "'unsafe-inline'"], // CSS'lerin kendi kaynaklardan yüklenmesini sağlar
-      },
-    },
-    crossOriginEmbedderPolicy: false,
-  }));
+  // app.use(helmet({
+  //   // Tarayıcının sadece belirli kaynaklara erişmesini sağlar.
+  //   contentSecurityPolicy: {
+  //     directives: {
+  //       defaultSrc: ["'self'"], // Sadece kendi kaynaklara erişim
+  //       styleSrc: ["'self'", "'unsafe-inline'"], // CSS'lerin kendi kaynaklardan yüklenmesini sağlar
+  //     },
+  //   },
+  //   crossOriginEmbedderPolicy: false,
+  // }));
 
   // CORS configuration
   app.use(cors({
@@ -70,13 +71,17 @@ export function applyGlobalMiddleware(app: Application) {
   // Custom middleware (using shared middleware)
   app.use(defaultCorrelationIdMiddleware);
   app.use(requestLoggingMiddleware({
-    customLogger: (level: string, message: string, metadata?: any) => {
-      console.log(`[${level.toUpperCase()}] ${message}`, metadata || '');
-    }
+    customLogger: (level, message, metadata) => {
+      const logMethod = logger[level as keyof typeof logger];
+      if (typeof logMethod === 'function') {
+        (logMethod as (message: string, context?: any) => void)(message, metadata);
+      }
+    },
+    skipPaths: ['/health', '/metrics']
   }));
 
   // Metrics middleware
   if (config.METRICS_ENABLED) {
     app.use(metricsMiddleware());
   }
-} 
+}

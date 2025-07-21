@@ -3,38 +3,27 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Server = void 0;
 require('module-alias/register');
 const http_1 = require("http");
-const observability_1 = require("@observability-hub/observability");
 const app_1 = require("@/app");
 const initialize_services_1 = require("@/bootstrap/initialize-services");
+const logger_1 = require("@/bootstrap/logger");
 const config_1 = require("@/config");
 const database_1 = require("@/services/database");
 const redis_client_1 = require("@/services/redis-client");
 class Server {
     app;
     httpServer;
-    logger;
     constructor() {
         this.app = (0, app_1.createApp)();
         this.httpServer = (0, http_1.createServer)(this.app);
-        this.logger = new observability_1.ObservabilityLogger({
-            serviceName: config_1.config.SERVICE_NAME,
-            serviceVersion: config_1.config.SERVICE_VERSION,
-            environment: config_1.config.NODE_ENV,
-            rabbitmqUrl: config_1.derivedConfig.rabbitmq.url,
-            rabbitmqVhost: config_1.derivedConfig.rabbitmq.vhost,
-            rabbitmqExchange: config_1.derivedConfig.rabbitmq.exchange,
-            defaultLogLevel: config_1.config.LOG_LEVEL,
-        });
     }
     async start() {
         try {
             console.log('🔗 Initializing database connection...');
             await database_1.db.connect();
-            console.log('✅ Database connected and schema initialized');
             console.log('🔗 Initializing Redis services...');
             await (0, initialize_services_1.initializeServices)();
             this.httpServer.listen(config_1.config.PORT, () => {
-                this.logger.info('User service started successfully', {
+                logger_1.logger.info('User service started successfully', {
                     component: 'server',
                     port: config_1.config.PORT,
                     environment: config_1.config.NODE_ENV,
@@ -51,7 +40,7 @@ class Server {
             this.setupProcessHandlers();
         }
         catch (error) {
-            this.logger.error('Failed to start server', error, {
+            logger_1.logger.error('Failed to start server', error, {
                 component: 'server',
             });
             console.error('❌ Failed to start server:', error);
@@ -60,7 +49,7 @@ class Server {
     }
     setupSignalHandlers() {
         const gracefulShutdown = (signal) => {
-            this.logger.info(`Received ${signal}, shutting down gracefully`, {
+            logger_1.logger.info(`Received ${signal}, shutting down gracefully`, {
                 component: 'server',
                 signal,
             });
@@ -79,13 +68,13 @@ class Server {
                 catch (error) {
                     console.error('Error disconnecting Redis:', error);
                 }
-                this.logger.info('Server closed', {
+                logger_1.logger.info('Server closed', {
                     component: 'server',
                 });
                 process.exit(0);
             });
             setTimeout(() => {
-                this.logger.error('Forced shutdown after timeout', undefined, {
+                logger_1.logger.error('Forced shutdown after timeout', undefined, {
                     component: 'server',
                 });
                 process.exit(1);
@@ -96,11 +85,11 @@ class Server {
     }
     setupProcessHandlers() {
         process.on('uncaughtException', (error) => {
-            this.logger.error('Uncaught exception', error);
+            logger_1.logger.error('Uncaught exception', error);
             process.exit(1);
         });
         process.on('unhandledRejection', (reason) => {
-            this.logger.error('Unhandled rejection', reason);
+            logger_1.logger.error('Unhandled rejection', reason);
             process.exit(1);
         });
     }

@@ -1,18 +1,32 @@
-import { UserRepository, CreateUserRequest } from '@/services/user-repository';
+import { UserRepository, CreateUserRequest, UpdateUserRequest } from './user-repository';
 import { User } from '@/types/user';
 
 export class UserService {
-  constructor(private userRepository: UserRepository) {}
+  private repository: UserRepository;
 
-  async getUsers(): Promise<User[]> {
-    return this.userRepository.findAll();
+  constructor(repository: UserRepository) {
+    this.repository = repository;
   }
 
-  async createUser(userData: CreateUserRequest): Promise<User> {
-    return this.userRepository.create(userData);
+  async getUsers(): Promise<User[]> {
+    return this.repository.findAll();
   }
 
   async getUserById(id: string): Promise<User | null> {
-    return this.userRepository.findById(id);
+    return this.repository.findById(id);
+  }
+
+  async createUser(userData: CreateUserRequest): Promise<User> {
+    // Here you could add business logic, validation, etc.
+    return this.repository.create(userData);
+  }
+
+  async updateUser(id: string, userData: UpdateUserRequest): Promise<User | null> {
+    // Add business logic before updating
+    return this.repository.update(id, userData);
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    return this.repository.delete(id);
   }
 }

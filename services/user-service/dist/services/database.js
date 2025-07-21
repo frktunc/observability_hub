@@ -46,50 +46,10 @@ class DatabaseService {
         }
     }
     async initializeSchema() {
-        const client = await this.pool.connect();
-        try {
-            // Create users table if it doesn't exist
-            const createUsersTable = `
-        CREATE TABLE IF NOT EXISTS users (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          name VARCHAR(255) NOT NULL,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          role VARCHAR(50) DEFAULT 'user',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        -- Create updated_at trigger
-        CREATE OR REPLACE FUNCTION update_updated_at_column()
-        RETURNS TRIGGER AS $$
-        BEGIN
-          NEW.updated_at = CURRENT_TIMESTAMP;
-          RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        
-        -- Drop trigger if exists and create new one
-        DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-        CREATE TRIGGER update_users_updated_at
-          BEFORE UPDATE ON users
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-
-        -- Create indexes
-        CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-        CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-        CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
-      `;
-            await client.query(createUsersTable);
-            console.log('✅ Database schema initialized');
-        }
-        catch (error) {
-            console.error('❌ Failed to initialize database schema:', error);
-            throw error;
-        }
-        finally {
-            client.release();
-        }
+        // Schema is now managed by infrastructure scripts (e.g., docker-entrypoint-initdb.d)
+        // This function can be used for future migrations if needed, but for now,
+        // it will just confirm that the connection is ready.
+        console.log('✅ Database schema is managed by infrastructure, skipping application-level initialization.');
     }
     async query(text, params) {
         if (!this.isConnected) {

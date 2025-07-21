@@ -2,18 +2,26 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserService = void 0;
 class UserService {
-    userRepository;
-    constructor(userRepository) {
-        this.userRepository = userRepository;
+    repository;
+    constructor(repository) {
+        this.repository = repository;
     }
     async getUsers() {
-        return this.userRepository.findAll();
-    }
-    async createUser(userData) {
-        return this.userRepository.create(userData);
+        return this.repository.findAll();
     }
     async getUserById(id) {
-        return this.userRepository.findById(id);
+        return this.repository.findById(id);
+    }
+    async createUser(userData) {
+        // Here you could add business logic, validation, etc.
+        return this.repository.create(userData);
+    }
+    async updateUser(id, userData) {
+        // Add business logic before updating
+        return this.repository.update(id, userData);
+    }
+    async deleteUser(id) {
+        return this.repository.delete(id);
     }
 }
 exports.UserService = UserService;

@@ -1,6 +1,7 @@
 import { ObservabilityLogger } from '@observability-hub/observability';
-import { config, derivedConfig } from '../config';
+import { config, derivedConfig } from '@/config';
 
+// Create a single, shared logger instance for the entire service
 export const logger = new ObservabilityLogger({
   serviceName: config.SERVICE_NAME,
   serviceVersion: config.SERVICE_VERSION,
@@ -9,4 +10,4 @@ export const logger = new ObservabilityLogger({
   rabbitmqVhost: derivedConfig.rabbitmq.vhost,
   rabbitmqExchange: derivedConfig.rabbitmq.exchange,
   defaultLogLevel: config.LOG_LEVEL as any,
-}); 
+});
