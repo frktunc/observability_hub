@@ -24,4 +24,4 @@ export const {
 } = redisService;
 
 // Re-export types for compatibility
-export type { RedisClient } from '@observability-hub/observability/redis'; 
+export type { RedisClient } from '@observability-hub/observability/redis';

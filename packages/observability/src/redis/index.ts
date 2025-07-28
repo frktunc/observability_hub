@@ -191,4 +191,4 @@ export const createRedisService = (config: RedisConfig, serviceName: string) => 
     initializeRedis,
     closeRedis
   };
-}; 
+};
