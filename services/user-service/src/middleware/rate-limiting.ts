@@ -86,6 +86,11 @@ class RateLimitingMiddleware {
   }
 
   async middleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+    // Skip rate limiting for health and metrics so they always respond (e.g. load balancer / k8s probes)
+    if (req.path === '/health' || req.path === '/metrics') {
+      return next();
+    }
+
     try {
       const key = this.generateKey(req);
       const limiter = this.redisLimiter || this.memoryLimiter;
