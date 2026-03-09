@@ -86,9 +86,9 @@ health-infra: ## Check infrastructure health
 
 health-services: ## Check microservices health
 	@echo "🔍 Checking microservices health..."
-	@curl -s http://localhost:3001/health || echo "❌ User Service not responding"
-	@curl -s http://localhost:3002/health || echo "❌ Order Service not responding"
-	@curl -s http://localhost:3003/health || echo "❌ Product Service not responding"
+	@curl -s http://localhost:8081/health || echo "❌ User Service not responding"
+	@curl -s http://localhost:8080/health || echo "❌ Order Service not responding"
+	@curl -s http://localhost:8082/health || echo "❌ Product Service not responding"
 
 health-quick: ## Quick health check (ports only)
 	@echo "⚡ Quick health check..."
