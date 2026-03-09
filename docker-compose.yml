@@ -440,9 +440,12 @@ services:
     container_name: obs_user_service
     restart: unless-stopped
     depends_on:
-      - rabbitmq
-      - user_service_db
-      - jaeger
+      rabbitmq:
+        condition: service_healthy
+      user_service_db:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
     networks:
       - observability
     environment:

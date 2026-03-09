@@ -31,21 +31,27 @@ export class DatabaseService {
   }
 
   async connect(): Promise<void> {
-    try {
-      // Test the connection
-      const client = await this.pool.connect();
-      await client.query('SELECT NOW()');
-      client.release();
-      
-      console.log('✅ Database connected successfully');
-      this.isConnected = true;
-      
-      // Initialize schema
-      await this.initializeSchema();
-    } catch (error) {
-      console.error('❌ Database connection failed:', error);
-      this.isConnected = false;
-      throw error;
+    const maxAttempts = 5;
+    const delayMs = 2000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const client = await this.pool.connect();
+        await client.query('SELECT NOW()');
+        client.release();
+
+        console.log('✅ Database connected successfully');
+        this.isConnected = true;
+
+        await this.initializeSchema();
+        return;
+      } catch (error) {
+        this.isConnected = false;
+        console.error(`❌ Database connection failed (attempt ${attempt}/${maxAttempts}):`, error);
+        if (attempt === maxAttempts) throw error;
+        console.log(`⏳ Retrying in ${delayMs}ms...`);
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
     }
   }
 

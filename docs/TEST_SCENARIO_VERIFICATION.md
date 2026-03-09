@@ -41,7 +41,7 @@ Bu hedef hem altyapıyı (`make health-infra`) hem mikroservisleri (`make health
 
 ```bash
 # User Service (8081)
-curl -s http://localhost:8081/health | jq . !!!
+curl -s http://localhost:8081/health | jq . 
 
 # Order Service (8080)
 curl -s http://localhost:8080/health | jq .
@@ -50,12 +50,14 @@ curl -s http://localhost:8080/health | jq .
 curl -s http://localhost:8082/health | jq .
 
 # Collector (metrik ve health tek portta: 9090)
-curl -s http://localhost:9090/health | jq .  !!!
+curl -s http://localhost:9090/health | jq .  
 ```
 
 **Beklenen:** Her biri JSON döner (örn. `status`, `dependencies`, `service` alanları). Collector `/health` örnek: `{"status":"OK","service":"collector","redis":"OK"}`.
 
 **User-service (8081) yanıt vermiyorsa:** user-service `/health` Redis, DB ve RabbitMQ’ya bağlanıp kontrol eder. Rate limiting artık `/health` ve `/metrics` için atlanıyor; yine de yanıt yoksa Redis veya RabbitMQ erişilemiyor/çok yavaş olabilir. Container loglarına bakın: `docker-compose logs --tail=50 user-service`. **Collector (9090)** yanıt vermiyorsa collector container’ının ayağa kalktığını ve Redis’e bağlandığını kontrol edin.
+
+**"ENOTFOUND user_service_db" veya "57P01 terminating connection":** user-service, DB hazır olana kadar başlaması için `depends_on: user_service_db: condition: service_healthy` kullanır; bağlantı 5 denemeye kadar (aralıklı) yeniden dener. Hata sürerse: `docker-compose down` sonra `make up` ile tümünü yeniden başlatın.
 
 **Çıktıyı nerede görürsünüz:** `curl` çıktısı terminalde. Loglama yapmıyorsanız çıktıyı dosyaya yönlendirebilirsiniz:
 
