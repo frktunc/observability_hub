@@ -65,7 +65,7 @@ const configSchema = z.object({
 
   // Tracing Configuration
   JAEGER_ENABLED: z.coerce.boolean().default(true),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://jaeger:4318/v1/traces'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://obs_jaeger:4318/v1/traces'),
   
   // Health Check Configuration
   HEALTH_CHECK_ENABLED: z.coerce.boolean().default(true),

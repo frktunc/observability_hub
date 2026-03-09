@@ -3,7 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { config, derivedConfig, validateConfiguration } from './config';
-import { v4 as uuidv4 } from 'uuid';
 import { db } from './services/database';
 
 // Import routes
@@ -13,10 +12,10 @@ import productsRoutes from './routes/products';
 
 import { ObservabilityLogger } from '@observability-hub/observability';
 import {
-  correlationIdMiddleware,
-  errorHandlerMiddleware,
+  defaultCorrelationIdMiddleware,
+  defaultErrorHandler,
+  defaultMetrics,
   requestLoggingMiddleware,
-  metricsMiddleware,
 } from '@observability-hub/observability/middleware';
 
 const logger = new ObservabilityLogger({
@@ -36,9 +35,9 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Custom middleware
-app.use(correlationIdMiddleware());
-app.use(requestLoggingMiddleware({ 
+// Custom middleware (aligned with order-service)
+app.use(defaultCorrelationIdMiddleware);
+app.use(requestLoggingMiddleware({
   customLogger: (level, message, meta) => {
     switch (level) {
       case 'warn':
@@ -51,17 +50,17 @@ app.use(requestLoggingMiddleware({
         logger.info(message, meta);
         break;
     }
-  } 
+  },
 }));
-app.use(metricsMiddleware);
+app.use(defaultMetrics);
 
 // Routes
 app.use('/health', healthRoutes);
 app.use('/metrics', metricsRoutes);
 app.use('/api/v1/products', productsRoutes);
 
-// Error handling
-app.use(errorHandlerMiddleware({ customLogger: (err, req) => logger.error(err.message, err, { request: { httpMethod: req.method, path: req.path, correlationId: req.correlationId } }) }));
+// Error handling (must be last)
+app.use(defaultErrorHandler);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -107,50 +106,44 @@ async function startServer() {
   }
 }
 
-let server: any = null;
+const serverReadyPromise = startServer();
 
-startServer().then((s) => {
-  server = s;
-}).catch((error) => {
+serverReadyPromise.catch((error) => {
   console.error('Failed to start server:', error);
   process.exit(1);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('🛑 Received SIGTERM, shutting down gracefully...');
-  if (server) {
-    server.close(async () => {
-      try {
-        await db.disconnect();
-        logger.info('✅ Database disconnected');
-      } catch (error) {
-        logger.error('Error disconnecting database:', error instanceof Error ? error : new Error(String(error)));
+function gracefulShutdown(signal: string) {
+  return async () => {
+    logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
+    try {
+      const server = await Promise.race([
+        serverReadyPromise,
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('Shutdown timeout waiting for server')), 10000)
+        ),
+      ]);
+      if (server) {
+        server.close(async () => {
+          try {
+            await db.disconnect();
+            logger.info('✅ Database disconnected');
+          } catch (error) {
+            logger.error('Error disconnecting database:', error instanceof Error ? error : new Error(String(error)));
+          }
+          logger.info('✅ Server closed');
+          process.exit(0);
+        });
+      } else {
+        process.exit(0);
       }
-      logger.info('✅ Server closed');
-      process.exit(0);
-    });
-  } else {
-    process.exit(0);
-  }
-});
+    } catch {
+      process.exit(1);
+    }
+  };
+}
 
-process.on('SIGINT', async () => {
-  logger.info('🛑 Received SIGINT, shutting down gracefully...');
-  if (server) {
-    server.close(async () => {
-      try {
-        await db.disconnect();
-        logger.info('✅ Database disconnected');
-      } catch (error) {
-        logger.error('Error disconnecting database:', error instanceof Error ? error : new Error(String(error)));
-      }
-      logger.info('✅ Server closed');
-      process.exit(0);
-    });
-  } else {
-    process.exit(0);
-  }
-});
+process.on('SIGTERM', gracefulShutdown('SIGTERM'));
+process.on('SIGINT', gracefulShutdown('SIGINT'));
 
 export default app;

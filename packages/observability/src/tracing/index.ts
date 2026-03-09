@@ -14,14 +14,15 @@ interface TracerConfig {
 
 let sdk: NodeSDK | null = null;
 
-export function initTracer(config: TracerConfig): void {
+export function initTracer(config: TracerConfig, logger?: any): void {
+  const log = logger || console;
   if (!config.jaegerEnabled) {
-    console.log('⚪ Jaeger tracing is disabled.');
+    log.info('⚪ Jaeger tracing is disabled.');
     return;
   }
 
   if (sdk) {
-    console.log('⚪ Jaeger tracer already initialized.');
+    log.info('⚪ Jaeger tracer already initialized.');
     return;
   }
 
@@ -41,20 +42,20 @@ export function initTracer(config: TracerConfig): void {
 
   try {
     sdk.start();
-    console.log('🟢 Jaeger tracer initialized successfully.');
+    log.info('🟢 Jaeger tracer initialized successfully.');
 
     // Graceful shutdown
     process.on('SIGTERM', () => {
-      sdk?.shutdown().then(() => console.log('🔵 Jaeger tracer terminated.'))
-        .catch((error: Error) => console.error('Error terminating Jaeger tracer:', error));
+      sdk?.shutdown().then(() => log.info('🔵 Jaeger tracer terminated.'))
+        .catch((error: Error) => log.error('Error terminating Jaeger tracer:', error));
     });
     process.on('SIGINT', () => {
-      sdk?.shutdown().then(() => console.log('🔵 Jaeger tracer terminated.'))
-        .catch((error: Error) => console.error('Error terminating Jaeger tracer:', error));
+      sdk?.shutdown().then(() => log.info('🔵 Jaeger tracer terminated.'))
+        .catch((error: Error) => log.error('Error terminating Jaeger tracer:', error));
     });
 
   } catch (error) {
-    console.error('🔴 Failed to initialize Jaeger tracer:', error as Error);
+    log.error('🔴 Failed to initialize Jaeger tracer:', error as Error);
   }
 }
 

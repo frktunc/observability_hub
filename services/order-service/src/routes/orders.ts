@@ -21,12 +21,16 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   
   try {
     // Extract query parameters for filtering
+    const DEFAULT_LIMIT = 50;
+    const MAX_LIMIT = 100;
+    const rawLimit = req.query.limit ? parseInt(req.query.limit as string) : DEFAULT_LIMIT;
+    const limit = Math.min(Number.isNaN(rawLimit) ? DEFAULT_LIMIT : rawLimit, MAX_LIMIT);
     const filters: OrderFilters = {
       userId: req.query.userId as string,
       status: req.query.status ? req.query.status as OrderStatus : undefined,
       startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
       endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
-      limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+      limit,
       offset: req.query.offset ? parseInt(req.query.offset as string) : 0,
     };
 

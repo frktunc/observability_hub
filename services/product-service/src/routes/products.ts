@@ -30,8 +30,12 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       search: req.query.search as string
     };
     
+    const DEFAULT_LIMIT = 50;
+    const MAX_LIMIT = 100;
+    const rawLimit = req.query.limit ? parseInt(req.query.limit as string) : DEFAULT_LIMIT;
+    const limit = Math.min(Number.isNaN(rawLimit) ? DEFAULT_LIMIT : rawLimit, MAX_LIMIT);
     const pagination = {
-      limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
+      limit,
       offset: req.query.offset ? parseInt(req.query.offset as string) : 0
     };
     
@@ -64,6 +68,68 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// GET /api/v1/products/stats - Get product statistics (must be before /:id)
+router.get('/stats', async (req: Request, res: Response): Promise<void> => {
+  const correlationId = (req as any).correlationId || 'unknown';
+  
+  try {
+    logger.info('Fetching product statistics', { correlationId });
+    
+    const stats = await db.getProductStats();
+    
+    logger.info('Product statistics fetched successfully', { correlationId });
+    
+    res.json({
+      stats,
+      correlationId
+    });
+  } catch (error) {
+    logger.error('Failed to fetch product statistics', error instanceof Error ? error : new Error(String(error)), {
+      correlationId
+    });
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch product statistics',
+      correlationId
+    });
+  }
+});
+
+// GET /api/v1/products/sku/:sku - Get product by SKU (must be before /:id)
+router.get('/sku/:sku', async (req: Request, res: Response): Promise<void> => {
+  const correlationId = (req as any).correlationId || 'unknown';
+  const sku = req.params.sku;
+  
+  try {
+    logger.info('Fetching product by SKU', { sku, correlationId });
+    
+    const product = await db.getProductBySku(sku);
+    
+    if (!product) {
+      logger.warn('Product not found by SKU', { sku, correlationId });
+      res.status(404).json({
+        error: 'Product not found',
+        sku,
+        correlationId
+      });
+      return;
+    }
+    
+    logger.info('Product fetched successfully by SKU', { sku, correlationId });
+    res.json({ product, correlationId });
+  } catch (error) {
+    logger.error('Failed to fetch product by SKU', error instanceof Error ? error : new Error(String(error)), {
+      sku,
+      correlationId
+    });
+    res.status(500).json({
+      error: 'Internal server error',
+      message: 'Failed to fetch product',
+      correlationId
+    });
+  }
+});
+
 // GET /api/v1/products/:id - Get product by ID
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   const correlationId = (req as any).correlationId || 'unknown';
@@ -89,41 +155,6 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     logger.error('Failed to fetch product by ID', error instanceof Error ? error : new Error(String(error)), {
       productId,
-      correlationId
-    });
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to fetch product',
-      correlationId
-    });
-  }
-});
-
-// GET /api/v1/products/sku/:sku - Get product by SKU
-router.get('/sku/:sku', async (req: Request, res: Response): Promise<void> => {
-  const correlationId = (req as any).correlationId || 'unknown';
-  const sku = req.params.sku;
-  
-  try {
-    logger.info('Fetching product by SKU', { sku, correlationId });
-    
-    const product = await db.getProductBySku(sku);
-    
-    if (!product) {
-      logger.warn('Product not found by SKU', { sku, correlationId });
-      res.status(404).json({
-        error: 'Product not found',
-        sku,
-        correlationId
-      });
-      return;
-    }
-    
-    logger.info('Product fetched successfully by SKU', { sku, correlationId });
-    res.json({ product, correlationId });
-  } catch (error) {
-    logger.error('Failed to fetch product by SKU', error instanceof Error ? error : new Error(String(error)), {
-      sku,
       correlationId
     });
     res.status(500).json({
@@ -246,33 +277,6 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({
       error: 'Internal server error',
       message: 'Failed to delete product',
-      correlationId
-    });
-  }
-});
-
-// GET /api/v1/products/stats - Get product statistics
-router.get('/stats', async (req: Request, res: Response): Promise<void> => {
-  const correlationId = (req as any).correlationId || 'unknown';
-  
-  try {
-    logger.info('Fetching product statistics', { correlationId });
-    
-    const stats = await db.getProductStats();
-    
-    logger.info('Product statistics fetched successfully', { correlationId });
-    
-    res.json({
-      stats,
-      correlationId
-    });
-  } catch (error) {
-    logger.error('Failed to fetch product statistics', error instanceof Error ? error : new Error(String(error)), {
-      correlationId
-    });
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to fetch product statistics',
       correlationId
     });
   }

@@ -15,9 +15,11 @@ export class RedisClient {
   private client: Redis;
   private isConnected = false;
   private serviceName: string;
+  private log: any;
 
-  constructor(config: RedisConfig, serviceName: string) {
+  constructor(config: RedisConfig, serviceName: string, logger?: any) {
     this.serviceName = serviceName;
+    this.log = logger || console;
     
     this.client = new Redis({
       host: config.host,
@@ -41,45 +43,46 @@ export class RedisClient {
 
   private setupEventHandlers(): void {
     this.client.on('connect', () => {
-      console.log(`🔗 [${this.serviceName}] Redis connected successfully`);
+      this.log.info(`🔗 [${this.serviceName}] Redis connected successfully`);
       this.isConnected = true;
     });
 
     this.client.on('ready', () => {
-      console.log(`✅ [${this.serviceName}] Redis is ready to accept commands`);
+      this.log.info(`✅ [${this.serviceName}] Redis is ready to accept commands`);
     });
 
     this.client.on('error', (error) => {
-      console.error(`❌ [${this.serviceName}] Redis connection error:`, error);
+      this.log.error(`❌ [${this.serviceName}] Redis connection error:`, error);
       this.isConnected = false;
     });
 
     this.client.on('close', () => {
-      console.log(`🔌 [${this.serviceName}] Redis connection closed`);
+      this.log.info(`🔌 [${this.serviceName}] Redis connection closed`);
       this.isConnected = false;
     });
 
     this.client.on('reconnecting', () => {
-      console.log(`🔄 [${this.serviceName}] Redis reconnecting...`);
+      this.log.info(`🔄 [${this.serviceName}] Redis reconnecting...`);
     });
   }
 
   async connect(): Promise<void> {
     try {
       await this.client.connect();
-      console.log(`🎯 [${this.serviceName}] Redis client initialized successfully`);
+      this.log.info(`🎯 [${this.serviceName}] Redis client initialized successfully`);
     } catch (error) {
-      console.error(`💥 [${this.serviceName}] Failed to connect to Redis:`, error);
+      this.log.error(`💥 [${this.serviceName}] Failed to connect to Redis:`, error);
       throw error;
     }
   }
+  
 
   async disconnect(): Promise<void> {
     try {
       await this.client.disconnect();
-      console.log(`👋 [${this.serviceName}] Redis client disconnected`);
+      this.log.info(`👋 [${this.serviceName}] Redis client disconnected`);
     } catch (error) {
-      console.error(`❌ [${this.serviceName}] Error disconnecting from Redis:`, error);
+      this.log.error(`❌ [${this.serviceName}] Error disconnecting from Redis:`, error);
       throw error;
     }
   }
@@ -96,7 +99,7 @@ export class RedisClient {
     try {
       return await this.client.ping();
     } catch (error) {
-      console.error(`[${this.serviceName}] Redis ping failed:`, error);
+      this.log.error(`[${this.serviceName}] Redis ping failed:`, error);
       throw error;
     }
   }
@@ -109,11 +112,17 @@ export class RedisClient {
     
     const results = await pipeline.exec();
     
-    if (!results || !results[0] || results[0][1] === null || results[0][1] === undefined) {
+    if (!results || !results[0]) {
       throw new Error('Failed to increment counter');
     }
-    
-    return results[0][1] as number;
+    const [err, value] = results[0];
+    if (err) {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+    if (value === null || value === undefined) {
+      throw new Error('Failed to increment counter');
+    }
+    return value as number;
   }
 
   async getCounter(key: string): Promise<number> {
@@ -158,17 +167,17 @@ export class RedisClient {
 }
 
 // Factory function for creating Redis client instances
-export const createRedisClient = (config: RedisConfig, serviceName: string): RedisClient => {
-  return new RedisClient(config, serviceName);
+export const createRedisClient = (config: RedisConfig, serviceName: string, logger?: any): RedisClient => {
+  return new RedisClient(config, serviceName, logger);
 };
 
 // Singleton pattern for services
-export const createRedisService = (config: RedisConfig, serviceName: string) => {
+export const createRedisService = (config: RedisConfig, serviceName: string, logger?: any) => {
   let redisClient: RedisClient | null = null;
 
   const getRedisClient = (): RedisClient => {
     if (!redisClient) {
-      redisClient = new RedisClient(config, serviceName);
+      redisClient = new RedisClient(config, serviceName, logger);
     }
     return redisClient;
   };
