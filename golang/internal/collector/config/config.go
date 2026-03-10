@@ -6,36 +6,46 @@ import (
 	"time"
 )
 
-// Config stores all configuration for the application.
-// The values are read from environment variables.
+// Config: Uygulamanın tüm çalışma parametrelerini tutan ana yapı.
+// Değerler çevre değişkenlerinden (Environment Variables) beslenir.
 type Config struct {
-	RabbitMQURL     string
-	PostgresURL     string
-	QueueName       string
-	ExchangeName    string
-	DLXName         string
-	DLQName         string
-	BatchSize       int
-	BatchTimeout    time.Duration
-	WorkerPoolSize  int
-	MetricsPort     string
-	HealthCheckPort string
-	RetryMax        int
-	RetryInterval   time.Duration
-	// Redis Configuration
+	// Mesaj Kuyruğu (RabbitMQ) Ayarları
+	RabbitMQURL  string
+	QueueName    string
+	ExchangeName string
+	DLXName      string // Dead Letter Exchange (Hatalı mesajların yönlendirileceği yer)
+	DLQName      string // Dead Letter Queue (Hatalı mesajların birikeceği kuyruk)
+
+	// Veritabanı ve Depolama Ayarları
+	PostgresURL      string
+	ElasticsearchURL string
+
+	// Collector (Toplayıcı) Davranış Ayarları
+	BatchSize      int           // Tek seferde işlenecek maksimum mesaj sayısı
+	BatchTimeout   time.Duration // Belirlenen sayıya ulaşılmasa bile beklenilecek süre
+	WorkerPoolSize int           // Paralel çalışacak işçi (goroutine) sayısı
+
+	// İzlenebilirlik (Observability) Portları
+	MetricsPort     string // Prometheus vb. için metrik adresi
+	HealthCheckPort string // Kubernetes veya Load Balancer için sağlık kontrolü
+
+	// Yeniden Deneme (Retry) Politikası
+	RetryMax      int           // Başarısız işlemde maksimum deneme sayısı
+	RetryInterval time.Duration // Denemeler arasındaki bekleme süresi
+
+	// Redis Önbellek (Cache) Yapılandırması
 	RedisURL        string
 	RedisPassword   string
 	RedisDB         int
-	RedisPoolSize   int
-	RedisMinIdle    int
+	RedisPoolSize   int // Aktif tutulacak bağlantı havuzu boyutu
+	RedisMinIdle    int // Boşta bekletilecek minimum bağlantı
 	RedisMaxRetries int
-	RedisTTL        time.Duration
-	// Elasticsearch Configuration
-	ElasticsearchURL string
+	RedisTTL        time.Duration // Verinin bellekte kalma süresi
 }
 
-// Load reads configuration from environment variables and returns a new Config struct.
+// Load: Çevre değişkenlerini okur, veri tiplerini dönüştürür ve Config nesnesini döner.
 func Load() (*Config, error) {
+	// Sayısal değerlerin (string -> int) ve sürelerin (string -> duration) dönüşümü
 	batchSize, err := strconv.Atoi(getEnv("COLLECTOR_BATCH_SIZE", "100"))
 	if err != nil {
 		return nil, err
@@ -86,6 +96,7 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// Config struct'ının varsayılan değerlerle veya env verileriyle oluşturulması
 	cfg := &Config{
 		RabbitMQURL:     getEnv("RABBITMQ_URL", "amqp://obs_user:obs_password@obs_rabbitmq:5672/"),
 		PostgresURL:     getEnv("POSTGRES_URL", "postgres://user:password@localhost:5432/logs?sslmode=disable"),
@@ -100,7 +111,8 @@ func Load() (*Config, error) {
 		RetryMax:        retryMax,
 		BatchTimeout:    batchTimeout,
 		RetryInterval:   retryInterval,
-		// Redis Configuration
+
+		// Redis Yapılandırması
 		RedisURL:        getEnv("REDIS_URL", "redis://obs_redis:6379"),
 		RedisPassword:   getEnv("REDIS_PASSWORD", ""),
 		RedisDB:         redisDB,
@@ -108,13 +120,14 @@ func Load() (*Config, error) {
 		RedisMinIdle:    redisMinIdle,
 		RedisMaxRetries: redisMaxRetries,
 		RedisTTL:        redisTTL,
-		// Elasticsearch Configuration
+
+		// Elasticsearch Yapılandırması
 		ElasticsearchURL: getEnv("ELASTICSEARCH_URL", "http://localhost:9200"),
 	}
 	return cfg, nil
 }
 
-// getEnv retrieves an environment variable or returns a default value.
+// getEnv: Belirtilen anahtarı (key) sistemde arar, bulamazsa varsayılanı (fallback) döner.
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
