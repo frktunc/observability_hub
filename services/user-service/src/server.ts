@@ -19,6 +19,10 @@ export class Server {
 
   public async start(): Promise<void> {
     try {
+      console.log('🔗 Initializing logger connection to RabbitMQ...');
+      await logger.connect();
+      console.log('✅ Logger connected to RabbitMQ');
+
       console.log('🔗 Initializing database connection...');
       await db.connect();
 

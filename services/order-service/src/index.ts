@@ -32,6 +32,7 @@ const logger = new ObservabilityLogger({
 
 async function startServer() {
   try {
+  
     // Initialize database connection first
     console.log('🔗 Initializing database connection...');
     await db.connect();
