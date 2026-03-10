@@ -9,106 +9,34 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// Consumer holds the necessary components for a RabbitMQ consumer.
+// Consumer, RabbitMQ ile iletişim kurmak için gerekli bağlantı ve kanal bilgilerini tutar.
 type Consumer struct {
-	conn    *amqp.Connection
-	channel *amqp.Channel
-	cfg     *config.Config
+	conn    *amqp.Connection // RabbitMQ sunucusuna olan ana bağlantı
+	channel *amqp.Channel    // Mesaj alıp göndermek için kullanılan iletişim kanalı
+	cfg     *config.Config   // Kuyruk ve Exchange isimleri gibi yapılandırma ayarları
 }
 
-// New creates a new RabbitMQ consumer.
+// New, yapılandırma (config) bilgilerini kullanarak yeni bir RabbitMQ tüketicisi (consumer) oluşturur.
 func New(cfg *config.Config) (*Consumer, error) {
+	// 1. Adım: RabbitMQ sunucusuna bağlantı açıyoruz
 	conn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
 	}
 
+	// 2. Adım: Bu bağlantı üzerinden bir iletişim kanalı oluşturuyoruz
 	ch, err := conn.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open a channel: %w", err)
 	}
 
-	// Declare the main exchange (topic)
-	err = ch.ExchangeDeclare(
-		cfg.ExchangeName, // name
-		"topic",          // type
-		true,             // durable
-		false,            // auto-deleted
-		false,            // internal
-		false,            // no-wait
-		nil,              // arguments
-	)
+	// 3. Adım: Exchange ve Kuyruk tanımlamalarını (topoloji) ayırılmış fonksiyonda yapıyoruz
+	err = setupTopology(ch, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to declare main exchange: %w", err)
+		return nil, fmt.Errorf("failed to setup rabbitmq topology: %w", err)
 	}
 
-	// Declare the Dead Letter Exchange
-	err = ch.ExchangeDeclare(
-		cfg.DLXName, // name
-		"direct",    // type
-		true,        // durable
-		false,       // auto-deleted
-		false,       // internal
-		false,       // no-wait
-		nil,         // arguments
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to declare DLX: %w", err)
-	}
-
-	// Declare the Dead Letter Queue
-	_, err = ch.QueueDeclare(
-		cfg.DLQName, // name
-		true,        // durable
-		false,       // delete when unused
-		false,       // exclusive
-		false,       // no-wait
-		nil,         // arguments
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to declare DLQ: %w", err)
-	}
-
-	// Bind the DLQ to the DLX
-	err = ch.QueueBind(
-		cfg.DLQName, // queue name
-		"",          // routing key
-		cfg.DLXName, // exchange
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bind DLQ to DLX: %w", err)
-	}
-
-	// Declare the main queue with DLX arguments
-	args := amqp.Table{
-		"x-dead-letter-exchange": cfg.DLXName,
-	}
-	_, err = ch.QueueDeclare(
-		cfg.QueueName, // name
-		true,          // durable
-		false,         // delete when unused
-		false,         // exclusive
-		false,         // no-wait
-		args,          // arguments
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to declare main queue: %w", err)
-	}
-
-	// Bind the main queue to the main exchange with logs.* routing key
-	err = ch.QueueBind(
-		cfg.QueueName,    // queue name
-		"logs.#",         // routing key
-		cfg.ExchangeName, // exchange
-		false,
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to bind main queue to exchange: %w", err)
-	}
-
+	// Kurulum başarılıysa Consumer nesnemizi döndürüyoruz
 	return &Consumer{
 		conn:    conn,
 		channel: ch,
@@ -116,23 +44,24 @@ func New(cfg *config.Config) (*Consumer, error) {
 	}, nil
 }
 
-// Start consuming messages from RabbitMQ.
-// It returns a channel of deliveries for workers to process.
+// Start, RabbitMQ'dan mesajları dinlemeye başlar.
+// İşçilerin (workers) işlemesi için akış halindeki mesajları içeren bir Go kanalı (<-chan) döndürür.
 func (c *Consumer) Start(ctx context.Context) (<-chan amqp.Delivery, error) {
+	// Belirtilen kuyruktan mesajları tüketmek için kayıt oluyoruz
 	msgs, err := c.channel.Consume(
-		c.cfg.QueueName, // queue
-		"",              // consumer
-		false,           // auto-ack is false. We will manually ack messages.
-		false,           // exclusive
-		false,           // no-local
-		false,           // no-wait
-		nil,             // args
+		c.cfg.QueueName, // Dinlenecek kuyruğun adı
+		"",              // Consumer etiketi (boş bırakılırsa RabbitMQ otomatik atar)
+		false,           // auto-ack (otomatik onay): false. Mesajların başarıyla işlendiğini biz manuel olarak bildireceğiz (veri kaybını önler).
+		false,           // exclusive: false. Bu kuyruğu başka consumer'lar (örneğin uygulamayı scale ettiğimizde) kullanabilsin.
+		false,           // no-local: false. Sunucunun kendi gönderdiği mesajları almasını engellemez.
+		false,           // no-wait: false. İşlemin tamamlanması için RabbitMQ'dan onay bekle.
+		nil,             // Ek argümanlar.
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register a consumer: %w", err)
 	}
 
-	// Reconnect logic
+	// Uygulama kapatıldığında (Context sonlandığında) bağlantıları temiz bir şekilde kapatmak için arka planda bir dinleyici başlatıyoruz
 	go func() {
 		<-ctx.Done()
 		log.Println("Shutting down consumer...")
@@ -142,7 +71,8 @@ func (c *Consumer) Start(ctx context.Context) (<-chan amqp.Delivery, error) {
 	return msgs, nil
 }
 
-// Close gracefully shuts down the connection and channel.
+// Close, RabbitMQ ile olan kanalı ve ana bağlantıyı güvenli ve duyarlı bir şekilde kapatır.
+// Kaynak sızıntılarını (resource leak) önlemek için uygulama kapanırken veya hata durumunda çağrılmalıdır.
 func (c *Consumer) Close() {
 	if c.channel != nil {
 		c.channel.Close()
