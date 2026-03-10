@@ -2,129 +2,66 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"observability_hub/golang/internal/collector/config"
-	"observability_hub/golang/internal/collector/consumer"
-	"observability_hub/golang/internal/collector/metrics"
-	"observability_hub/golang/internal/collector/storage"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
+
+	"observability_hub/golang/internal/collector/app"
+	"observability_hub/golang/internal/collector/config"
 
 	"go.uber.org/zap"
 )
 
 func main() {
+	// 1. Initialize Logger
 	logger, err := zap.NewProduction()
 	if err != nil {
 		log.Fatalf("can't initialize zap logger: %v", err)
 	}
 	defer logger.Sync()
 
+	// 2. Load Configuration
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Fatal("Failed to load configuration", zap.Error(err))
 	}
 
+	// 3. Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	metricsServer := metrics.NewServer(cfg)
-	metricsServer.Start()
+	// 4. Initialize the App (Dependency Injection Container)
+	application, err := app.New(ctx, cfg, logger)
+	if err != nil {
+		logger.Fatal("Failed to initialize application dependencies", zap.Error(err))
+	}
+	defer application.Close()
 
+	// 5. Handle OS Signals for Graceful Shutdown
+	go handleShutdownSignals(application, cancel, logger)
+
+	// 6. Start the App (Blocks until workers finish or context is cancelled)
+	if err := application.Start(ctx); err != nil {
+		logger.Fatal("Application encountered a fatal error while starting", zap.Error(err))
+	}
+}
+
+// handleShutdownSignals listens for SIGINT/SIGTERM and coordinates a graceful shutdown
+func handleShutdownSignals(application *app.App, cancel context.CancelFunc, logger *zap.Logger) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		logger.Info("Shutdown signal received, initiating graceful shutdown...")
 
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer shutdownCancel()
+	<-sigChan
+	logger.Info("Shutdown signal received, initiating graceful shutdown...")
 
-		metricsServer.Shutdown(shutdownCtx)
-		cancel()
-	}()
+	// Give the server 10 seconds to finish currently processing requests
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
-	// Initialize Redis client
-	redisClient, err := storage.NewRedisClient(ctx, cfg, logger)
-	if err != nil {
-		logger.Fatal("Failed to create Redis client", zap.Error(err))
-	}
-	defer redisClient.Close()
+	application.MetricsServer.Shutdown(shutdownCtx)
 
-	// Set Redis client for health checks
-	metricsServer.SetRedisClient(redisClient)
-
-	dbStorage, err := storage.NewDBStorageWithRedis(ctx, cfg, logger, redisClient)
-	if err != nil {
-		logger.Fatal("Failed to create database storage", zap.Error(err))
-	}
-	defer dbStorage.Close()
-
-	esStorage, err := storage.NewESStorage(cfg, logger)
-	if err != nil {
-		logger.Fatal("Failed to create Elasticsearch storage", zap.Error(err))
-	}
-	defer esStorage.Close()
-
-	rmqConsumer, err := consumer.New(cfg)
-	if err != nil {
-		logger.Fatal("Failed to create RabbitMQ consumer", zap.Error(err))
-	}
-	defer rmqConsumer.Close()
-
-	deliveries, err := rmqConsumer.Start(ctx)
-	if err != nil {
-		logger.Fatal("Failed to start consuming messages", zap.Error(err))
-	}
-
-	var wg sync.WaitGroup
-	for i := 0; i < cfg.WorkerPoolSize; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			logger.Info("Worker started", zap.Int("workerId", workerID))
-			for {
-				select {
-				case <-ctx.Done():
-					logger.Info("Worker shutting down", zap.Int("workerId", workerID))
-					return
-				case d, ok := <-deliveries:
-					if !ok {
-						logger.Info("Deliveries channel closed, worker shutting down.", zap.Int("workerId", workerID))
-						return
-					}
-					metrics.MessagesProcessed.Inc()
-
-					var event storage.LogEvent
-					if err := json.Unmarshal(d.Body, &event); err != nil {
-						logger.Error("Failed to unmarshal message", zap.Error(err), zap.Int("workerId", workerID), zap.String("body", string(d.Body)))
-						d.Nack(false, false)
-						metrics.MessagesNacked.Inc()
-						continue
-					}
-
-					dbStorage.AddToBatch(&event)
-
-					// Asynchronously send to Elasticsearch
-					go func(e storage.LogEvent) {
-						if err := esStorage.BulkIndexLogEvents(ctx, []*storage.LogEvent{&e}); err != nil {
-							logger.Error("Failed to index log event to Elasticsearch", zap.Error(err), zap.String("eventId", e.EventID))
-							// Here you might want to add metrics for ES failures
-						}
-					}(event)
-
-					d.Ack(false)
-					metrics.MessagesAcked.Inc()
-				}
-			}
-		}(i + 1)
-	}
-
-	logger.Info("Collector service started successfully. Waiting for messages...")
-	wg.Wait()
-	logger.Info("All workers have shut down. Exiting.")
+	// Cancel the main context to signal workers to stop
+	cancel()
 }
