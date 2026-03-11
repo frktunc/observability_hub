@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// App holds all the main dependencies of the application
+// App holds all the main dependencies of the applicationn
 type App struct {
 	Cfg           *config.Config
 	Logger        *zap.Logger
