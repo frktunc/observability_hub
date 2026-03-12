@@ -9,6 +9,7 @@ import (
 	"observability_hub/golang/internal/collector/consumer"
 	"observability_hub/golang/internal/collector/metrics"
 	"observability_hub/golang/internal/collector/storage"
+	"observability_hub/golang/internal/types"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
@@ -118,7 +119,7 @@ func (a *App) worker(ctx context.Context, wg *sync.WaitGroup, workerID int, deli
 func (a *App) processMessage(ctx context.Context, workerID int, d amqp.Delivery) {
 	metrics.MessagesProcessed.Inc()
 
-	var event storage.LogEvent
+	var event types.LogEvent
 	if err := json.Unmarshal(d.Body, &event); err != nil {
 		a.Logger.Error("Failed to unmarshal message", zap.Error(err), zap.Int("workerId", workerID), zap.String("body", string(d.Body)))
 		d.Nack(false, false)
@@ -132,8 +133,8 @@ func (a *App) processMessage(ctx context.Context, workerID int, d amqp.Delivery)
 	// 2. Asynchronously send to Elasticsearch
 	// Note: In an ideal scenario, Elasticsearch should also have a batching mechanism like dbStorage.AddToBatch
 	// However, to keep this refactoring exactly identical in behavior, we preserve this concurrent call block.
-	go func(e storage.LogEvent) {
-		if err := a.ESStorage.BulkIndexLogEvents(ctx, []*storage.LogEvent{&e}); err != nil {
+	go func(e types.LogEvent) {
+		if err := a.ESStorage.BulkIndexLogEvents(ctx, []*types.LogEvent{&e}); err != nil {
 			a.Logger.Error("Failed to index log event to Elasticsearch", zap.Error(err), zap.String("eventId", e.EventID))
 			// Here you might want to add metrics for ES failures
 		}

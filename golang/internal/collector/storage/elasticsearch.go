@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"observability_hub/golang/internal/collector/config"
+	"observability_hub/golang/internal/types"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -55,7 +56,7 @@ func NewESStorage(cfg *config.Config, logger *zap.Logger) (*ESStorage, error) {
 }
 
 // BulkIndexLogEvents indexes a batch of log events to Elasticsearch.
-func (s *ESStorage) BulkIndexLogEvents(ctx context.Context, events []*LogEvent) error {
+func (s *ESStorage) BulkIndexLogEvents(ctx context.Context, events []*types.LogEvent) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -64,7 +65,7 @@ func (s *ESStorage) BulkIndexLogEvents(ctx context.Context, events []*LogEvent) 
 	for _, event := range events {
 		// Meta line for bulk API
 		meta := map[string]interface{}{
-			"index": map[string]interface{}{
+			"create": map[string]interface{}{
 				"_index": getIndexName(event),
 				"_id":    event.EventID,
 			},
@@ -107,13 +108,13 @@ func (s *ESStorage) BulkIndexLogEvents(ctx context.Context, events []*LogEvent) 
 	var bulkResponse struct {
 		Errors bool `json:"errors"`
 		Items  []struct {
-			Index struct {
+			Create struct {
 				Status int `json:"status"`
 				Error  struct {
 					Type   string `json:"type"`
 					Reason string `json:"reason"`
 				} `json:"error"`
-			} `json:"index"`
+			} `json:"create"`
 		} `json:"items"`
 	}
 
@@ -124,8 +125,8 @@ func (s *ESStorage) BulkIndexLogEvents(ctx context.Context, events []*LogEvent) 
 	if bulkResponse.Errors {
 		var errorReasons []string
 		for _, item := range bulkResponse.Items {
-			if item.Index.Error.Type != "" {
-				errorReasons = append(errorReasons, fmt.Sprintf("type: %s, reason: %s", item.Index.Error.Type, item.Index.Error.Reason))
+			if item.Create.Error.Type != "" {
+				errorReasons = append(errorReasons, fmt.Sprintf("type: %s, reason: %s", item.Create.Error.Type, item.Create.Error.Reason))
 			}
 		}
 		return fmt.Errorf("bulk indexing had errors: %s", strings.Join(errorReasons, "; "))
@@ -136,7 +137,7 @@ func (s *ESStorage) BulkIndexLogEvents(ctx context.Context, events []*LogEvent) 
 }
 
 // getIndexName determines the index name based on the event source.
-func getIndexName(event *LogEvent) string {
+func getIndexName(event *types.LogEvent) string {
 	if event.Source.Service != "" {
 		// e.g., logs-user-service-2024-07
 		return fmt.Sprintf("logs-%s-%s",

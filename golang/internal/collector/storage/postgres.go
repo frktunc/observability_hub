@@ -7,110 +7,20 @@ import (
 	"fmt"
 	"observability_hub/golang/internal/collector/config"
 	"observability_hub/golang/internal/collector/metrics"
+	"observability_hub/golang/internal/types"
 	"sync"
 	"time"
-
-	"database/sql/driver"
 
 	"github.com/lib/pq"
 	"go.uber.org/zap"
 )
-
-// LogEvent corresponds to the structure of the log data from JSON schema.
-// We use pointers for optional fields.
-type LogEvent struct {
-	EventID       string    `json:"eventId"`
-	EventType     string    `json:"eventType"`
-	Version       string    `json:"version"`
-	Timestamp     time.Time `json:"timestamp"`
-	CorrelationID string    `json:"correlationId"`
-	Source        Source    `json:"source"`
-	Data          LogData   `json:"data"`
-	Metadata      Metadata  `json:"metadata"`
-	// Optional fields
-	CausationID *string  `json:"causationId,omitempty"`
-	Tracing     *Tracing `json:"tracing,omitempty"`
-}
-
-type Source struct {
-	Service  string  `json:"service"`
-	Version  string  `json:"version"`
-	Instance *string `json:"instance,omitempty"`
-	Region   *string `json:"region,omitempty"`
-}
-
-type Tracing struct {
-	TraceID      string            `json:"traceId"`
-	SpanID       *string           `json:"spanId,omitempty"`
-	ParentSpanID *string           `json:"parentSpanId,omitempty"`
-	Flags        *int              `json:"flags,omitempty"`
-	Baggage      map[string]string `json:"baggage,omitempty"`
-}
-
-type Metadata struct {
-	Priority    string         `json:"priority"`
-	Tags        []string       `json:"tags,omitempty"`
-	Environment *string        `json:"environment,omitempty"`
-	RetryCount  *int           `json:"retryCount,omitempty"`
-	SchemaURL   *string        `json:"schemaUrl,omitempty"`
-	Extra       map[string]any `json:"-"` // For additional properties
-}
-
-type LogData struct {
-	Level      string      `json:"level"`
-	Message    string      `json:"message"`
-	Timestamp  time.Time   `json:"timestamp"`
-	Context    *LogContext `json:"context,omitempty"`
-	Structured *JSONB      `json:"structured,omitempty"`
-	Error      *LogError   `json:"error,omitempty"`
-}
-
-type LogContext struct {
-	UserID    *string `json:"userId,omitempty"`
-	SessionID *string `json:"sessionId,omitempty"`
-	RequestID *string `json:"requestId,omitempty"`
-	Operation *string `json:"operation,omitempty"`
-	Component *string `json:"component,omitempty"`
-}
-
-type LogError struct {
-	Type        *string `json:"type,omitempty"`
-	Code        *string `json:"code,omitempty"`
-	Stack       *string `json:"stack,omitempty"`
-	Cause       *string `json:"cause,omitempty"`
-	Fingerprint *string `json:"fingerprint,omitempty"`
-}
-
-// JSONB is a helper type for handling jsonb fields.
-type JSONB map[string]interface{}
-
-// Value implements the driver.Valuer interface.
-func (j JSONB) Value() (driver.Value, error) {
-	if j == nil {
-		return nil, nil
-	}
-	return json.Marshal(j)
-}
-
-// Scan implements the sql.Scanner interface.
-func (j *JSONB) Scan(value interface{}) error {
-	if value == nil {
-		*j = nil
-		return nil
-	}
-	bytes, ok := value.([]byte)
-	if !ok {
-		return fmt.Errorf("Scan source is not []byte")
-	}
-	return json.Unmarshal(bytes, j)
-}
 
 // DBStorage handles database operations.
 type DBStorage struct {
 	db          *sql.DB
 	cfg         *config.Config
 	redis       *RedisClient
-	buffer      chan *LogEvent
+	buffer      chan *types.LogEvent
 	wg          sync.WaitGroup
 	mu          sync.Mutex
 	ticker      *time.Ticker
@@ -146,7 +56,7 @@ func NewDBStorageWithRedis(ctx context.Context, cfg *config.Config, logger *zap.
 		db:     db,
 		cfg:    cfg,
 		redis:  redis,
-		buffer: make(chan *LogEvent, cfg.BatchSize*2),
+		buffer: make(chan *types.LogEvent, cfg.BatchSize*2),
 		ticker: time.NewTicker(cfg.BatchTimeout),
 		ctx:    childCtx,
 		cancel: cancel,
@@ -160,7 +70,7 @@ func NewDBStorageWithRedis(ctx context.Context, cfg *config.Config, logger *zap.
 }
 
 // AddToBatch adds a log event to the processing buffer.
-func (s *DBStorage) AddToBatch(event *LogEvent) {
+func (s *DBStorage) AddToBatch(event *types.LogEvent) {
 	// Check for deduplication if Redis is available
 	if s.redis != nil {
 		isDuplicate, err := s.redis.CheckDuplication(event)
@@ -189,7 +99,7 @@ func (s *DBStorage) AddToBatch(event *LogEvent) {
 
 func (s *DBStorage) batchProcessor() {
 	defer s.wg.Done()
-	batch := make([]*LogEvent, 0, s.cfg.BatchSize)
+	batch := make([]*types.LogEvent, 0, s.cfg.BatchSize)
 	batchOptimizer := s.createBatchOptimizer()
 
 	for {
@@ -210,7 +120,7 @@ func (s *DBStorage) batchProcessor() {
 				metrics.CacheHitRatio.Set(batchOptimizer.cacheHitRatio)
 
 				s.flushWithRetry(batch)
-				batch = make([]*LogEvent, 0, s.cfg.BatchSize)
+				batch = make([]*types.LogEvent, 0, s.cfg.BatchSize)
 			}
 		case event := <-s.buffer:
 			batch = append(batch, event)
@@ -227,13 +137,13 @@ func (s *DBStorage) batchProcessor() {
 				metrics.CacheHitRatio.Set(batchOptimizer.cacheHitRatio)
 
 				s.flushWithRetry(batch)
-				batch = make([]*LogEvent, 0, s.cfg.BatchSize)
+				batch = make([]*types.LogEvent, 0, s.cfg.BatchSize)
 			}
 		}
 	}
 }
 
-func (s *DBStorage) flushWithRetry(batch []*LogEvent) {
+func (s *DBStorage) flushWithRetry(batch []*types.LogEvent) {
 	if len(batch) == 0 {
 		return
 	}
@@ -256,7 +166,7 @@ func (s *DBStorage) flushWithRetry(batch []*LogEvent) {
 	}
 }
 
-func (s *DBStorage) flush(batch []*LogEvent) error {
+func (s *DBStorage) flush(batch []*types.LogEvent) error {
 	if len(batch) == 0 {
 		return nil
 	}
@@ -364,7 +274,7 @@ func (s *DBStorage) Close() {
 	close(s.buffer)
 
 	// Flush any remaining items in the channel buffer
-	finalBatch := make([]*LogEvent, 0, len(s.buffer))
+	finalBatch := make([]*types.LogEvent, 0, len(s.buffer))
 	for event := range s.buffer {
 		finalBatch = append(finalBatch, event)
 	}
@@ -375,7 +285,7 @@ func (s *DBStorage) Close() {
 }
 
 // processMetadataCache handles metadata caching for a batch of events
-func (s *DBStorage) processMetadataCache(batch []*LogEvent) {
+func (s *DBStorage) processMetadataCache(batch []*types.LogEvent) {
 	processed := make(map[string]bool)
 
 	for _, event := range batch {
@@ -440,7 +350,7 @@ func (s *DBStorage) processMetadataCache(batch []*LogEvent) {
 }
 
 // prepareEventData prepares JSON data for database insertion with optimized metadata handling
-func (s *DBStorage) prepareEventData(event *LogEvent) ([]byte, []byte, []byte, []byte) {
+func (s *DBStorage) prepareEventData(event *types.LogEvent) ([]byte, []byte, []byte, []byte) {
 	// Use cached serialization for frequently accessed data
 	contextJSON, _ := json.Marshal(event.Data.Context)
 	errorJSON, _ := json.Marshal(event.Data.Error)
@@ -474,9 +384,9 @@ func (s *DBStorage) prepareEventData(event *LogEvent) ([]byte, []byte, []byte, [
 }
 
 // getEnvironmentFromMetadata extracts environment from metadata
-func getEnvironmentFromMetadata(metadata *Metadata) string {
-	if metadata.Environment != nil {
-		return *metadata.Environment
+func getEnvironmentFromMetadata(metadata *types.EventMetadata) string {
+	if metadata.Environment != "" {
+		return string(metadata.Environment)
 	}
 	return "unknown"
 }
@@ -509,7 +419,7 @@ func (s *DBStorage) createBatchOptimizer() *BatchOptimizer {
 }
 
 // getOptimalBatchSize calculates optimal batch size based on current conditions
-func (bo *BatchOptimizer) getOptimalBatchSize(batch []*LogEvent) int {
+func (bo *BatchOptimizer) getOptimalBatchSize(batch []*types.LogEvent) int {
 	// Update cache statistics if enough time has passed
 	if time.Since(bo.lastOptimization) > 30*time.Second {
 		bo.updateCacheStats(batch)
@@ -530,7 +440,7 @@ func (bo *BatchOptimizer) getOptimalBatchSize(batch []*LogEvent) int {
 }
 
 // updateCacheStats updates cache statistics for optimization
-func (bo *BatchOptimizer) updateCacheStats(batch []*LogEvent) {
+func (bo *BatchOptimizer) updateCacheStats(batch []*types.LogEvent) {
 	if len(batch) == 0 {
 		return
 	}

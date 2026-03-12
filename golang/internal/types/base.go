@@ -3,9 +3,52 @@
 package types
 
 import (
-	"encoding/json"
+	"database/sql/driver" // Veritabanı sürücüsüne değer gönderirken kullanılan "Valuer" interface'i buradadır
+	"encoding/json"       // Değerleri JSON stringine çevirmek (Marshal) ve Go tipine geri dönmek (Unmarshal) için
+	"fmt"
 	"time"
 )
+
+// JSONB özel bir tiptir ("alias" veya "helper type").
+// PostgreSQL veritabanındaki "jsonb" veri formatı ile Go programındaki veri formatı arasında köprü işlevi görür.
+// Arka planda map[string]interface{} yani "anahtarı yazı(string), değeri herhangi bir şey olan sözlük" tipindedir.
+type JSONB map[string]interface{}
+
+// Value metoduna dikkat et; bu fonksiyon "driver.Valuer" interface'ini uygular (implement eder).
+// Bu fonksiyon, Go nesnesi (struct veya map) PostgreSQL'e KAYDEDİLİRKEN çağrılır (Örn: INSERT veya UPDATE).
+func (j JSONB) Value() (driver.Value, error) {
+	// Eğer Go programında JSONB alanı boş (nil) bırakılmışsa,
+	// veritabanına NULL olarak kaydedilsin diye `nil, nil` döndürürüz.
+	if j == nil {
+		return nil, nil
+	}
+	// Eğer veri varsa, `json.Marshal` ile map yapısındaki veriyi
+	// "{"key": "value", "key2": 1}" gibi geçerli bir JSON stringine/byte dizisine dönüştürüp veritabanına yollarız.
+	return json.Marshal(j)
+}
+
+// Scan metodu tam tersidir; "sql.Scanner" interface'ini uygular.
+// Bu fonksiyon, PostgreSQL'den veri OKUNURKEN (Örn: SELECT sorgusu ile) çağrılır.
+func (j *JSONB) Scan(value interface{}) error {
+	// 1. Veritabanındaki değer boşsa (NULL ise)
+	if value == nil {
+		// Bizim hafızadaki map nesnemizi de nil (boş) yapıp hatasız çıkarız.
+		*j = nil
+		return nil
+	}
+
+	// 2. Veritabanından gelen değeri byte dizisine ([]byte) dönüştürmeyi deneriz.
+	// Postgres jsonb driver'ı genellikle veriyi bize []byte olarak verir.
+	bytes, ok := value.([]byte)
+	if !ok {
+		// Eğer gelen veri okuyamadığımız / beklemediğimiz bir formatta ise hata fırlatırız.
+		return fmt.Errorf("Scan source is not []byte")
+	}
+
+	// 3. Veritabanından gelen ham byte (JSON formatındaki yazı) dizisini alıp,
+	// json.Unmarshal ile tekrar Go'daki map[string]interface{} yapısına çözümleriz (deserialize ederiz).
+	return json.Unmarshal(bytes, j)
+}
 
 // EventPriority represents the priority level of an event
 type EventPriority string

@@ -41,4 +41,9 @@ dist/
 build/
 coverage/
 
+# Temporary test scripts
+services/user-service/run_test.ts
+services/user-service/simple_send.js
+services/user-service/run_test.js
+
 dump.rdb

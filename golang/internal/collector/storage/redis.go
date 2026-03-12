@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"observability_hub/golang/internal/collector/config"
+	"observability_hub/golang/internal/types"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -136,7 +137,7 @@ func (r *RedisClient) GetCachedMetadata(service, version, environment string) (*
 
 // generateDeduplicationKey creates a Redis key for message deduplication
 // Only checks for exact duplicate events (same EventID + CorrelationID)
-func (r *RedisClient) generateDeduplicationKey(event *LogEvent) string {
+func (r *RedisClient) generateDeduplicationKey(event *types.LogEvent) string {
 	// Use only EventID and CorrelationID for true duplicate detection
 	// Different requests should have different EventID/CorrelationID
 	// even if message content is similar
@@ -144,7 +145,7 @@ func (r *RedisClient) generateDeduplicationKey(event *LogEvent) string {
 }
 
 // CheckDuplication checks if a message has already been processed
-func (r *RedisClient) CheckDuplication(event *LogEvent) (bool, error) {
+func (r *RedisClient) CheckDuplication(event *types.LogEvent) (bool, error) {
 	key := r.generateDeduplicationKey(event)
 
 	exists, err := r.client.Exists(r.ctx, key).Result()
@@ -156,7 +157,7 @@ func (r *RedisClient) CheckDuplication(event *LogEvent) (bool, error) {
 }
 
 // MarkAsProcessed marks a message as processed for deduplication
-func (r *RedisClient) MarkAsProcessed(event *LogEvent) error {
+func (r *RedisClient) MarkAsProcessed(event *types.LogEvent) error {
 	key := r.generateDeduplicationKey(event)
 
 	// Store with a shorter TTL for deduplication (e.g., 24 hours)
