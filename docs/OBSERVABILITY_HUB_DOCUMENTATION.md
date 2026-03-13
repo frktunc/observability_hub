@@ -267,7 +267,7 @@ Dosya: `golang/internal/collector/metrics/server.go`.
 
 - **Node.js mikroservisleri:** user-service, order-service, product-service (Express; log’ları RabbitMQ’ya publish eder).
 - **Go Collector:** Yukarıda anlatıldığı gibi log event’lerini tüketir; Postgres, Redis ve Elasticsearch’e yazar; metrik ve health sunar.
-- **Altyapı:** PostgreSQL, Redis, RabbitMQ, Elasticsearch, Kibana, Jaeger, Prometheus, Grafana, cAdvisor; hepsi Docker Compose ile ayağa kaldırılabilir.
+- **Altyapı:** PostgreSQL, Redis, RabbitMQ, Elasticsearch, Kibana, Jaeger, Prometheus, Grafana, rabbitmq_exporter; hepsi Docker Compose ile ayağa kaldırılabilir.
 
 ## B.2 Servisler ve Portlar
 
@@ -300,7 +300,7 @@ Docker Compose ile tanımlı servisler (özet):
 - **Önbellek:** redis (obs_redis).
 - **Arama / log:** elasticsearch (obs_elasticsearch), kibana (obs_kibana).
 - **Tracing:** jaeger (obs_jaeger).
-- **Metrik / dashboard:** prometheus (obs_prometheus), grafana (obs_grafana), cadvisor, rabbitmq_exporter.
+- **Metrik / dashboard:** prometheus (obs_prometheus), grafana (obs_grafana), rabbitmq_exporter.
 - **Uygulama:** collector (obs_collector), user-service, order-service, product-service.
 
 Tümü `observability` bridge ağında.

@@ -265,7 +265,6 @@ services:
     networks:
       - observability
     depends_on:
-      - cadvisor
       - rabbitmq_exporter
     deploy:
       resources:
@@ -273,27 +272,6 @@ services:
           memory: 1G
         reservations:
           memory: 512M
-
-  # cAdvisor for container metrics
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.1
-    container_name: obs_cadvisor
-    restart: unless-stopped
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:rw
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    ports:
-      - "8088:8080"
-    networks:
-      - observability
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 128M
 
   # RabbitMQ Exporter
   rabbitmq_exporter:
@@ -457,16 +435,16 @@ services:
       - RABBITMQ_HOSTNAME=obs_rabbitmq
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-obs_user}:${RABBITMQ_PASSWORD:-obs_password}@obs_rabbitmq:5672/${RABBITMQ_VHOST:-/}
       - DATABASE_URL=postgresql://${USER_SERVICE_DB_USER:-user_service_user}:${USER_SERVICE_DB_PASSWORD:-user_service_password}@user_service_db:5432/${USER_SERVICE_DB_NAME:-user_service_db}
-      - JAEGER_ENABLED=${JAEGER_ENABLED:-true}
+      - JAEGER_ENABLED=false
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://obs_jaeger:4318/v1/traces}
     ports:
       - "8081:8081"
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 1G
         reservations:
-          memory: 128M
+          memory: 512M
 
   # Product Service Database
   product_service_db:

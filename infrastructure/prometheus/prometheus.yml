@@ -26,10 +26,6 @@ scrape_configs:
     static_configs:
       - targets: ['collector:9090']
 
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['obs_cadvisor:8080']
-
   - job_name: 'rabbitmq'
     static_configs:
       - targets: ['rabbitmq_exporter:9419']
