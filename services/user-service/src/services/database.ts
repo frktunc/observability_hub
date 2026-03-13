@@ -1,18 +1,14 @@
-import { Pool, Client } from 'pg';
-import { config, derivedConfig } from '../config';
+import { Pool } from 'pg';
+import { derivedConfig } from '../config';
 
 export class DatabaseService {
   private pool: Pool;
   private isConnected: boolean = false;
 
   constructor() {
+    // Use ONLY connectionString to avoid conflicts with individual params
     this.pool = new Pool({
       connectionString: derivedConfig.database.url,
-      host: derivedConfig.database.host,
-      port: derivedConfig.database.port,
-      database: derivedConfig.database.name,
-      user: derivedConfig.database.user,
-      password: derivedConfig.database.password,
       min: derivedConfig.database.pool.min,
       max: derivedConfig.database.pool.max,
       idleTimeoutMillis: 30000,
@@ -56,9 +52,6 @@ export class DatabaseService {
   }
 
   async initializeSchema(): Promise<void> {
-    // Schema is now managed by infrastructure scripts (e.g., docker-entrypoint-initdb.d)
-    // This function can be used for future migrations if needed, but for now,
-    // it will just confirm that the connection is ready.
     console.log('✅ Database schema is managed by infrastructure, skipping application-level initialization.');
   }
 
@@ -66,7 +59,6 @@ export class DatabaseService {
     if (!this.isConnected) {
       throw new Error('Database not connected');
     }
-    
     try {
       const result = await this.pool.query(text, params);
       return result;

@@ -49,7 +49,7 @@
     "module-alias": "^2.2.2",
     "node-config": "^0.0.2",
     "opossum": "^8.0.0",
-    "pg": "^8.11.3",
+    "pg": "8.11.3",
     "prom-client": "^15.1.0",
     "rate-limiter-flexible": "^4.0.1",
     "uuid": "^9.0.1",

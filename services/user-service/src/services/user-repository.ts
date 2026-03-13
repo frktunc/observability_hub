@@ -1,25 +1,23 @@
+import { db } from '@/services/database';
+
 export class UserRepository {
-  getUsers() {
-    // In a real application, this would fetch users from a database
-    return Promise.resolve([
-      { id: '1', name: 'John Doe' },
-      { id: '2', name: 'Jane Doe' },
-    ]);
+  async getUsers() {
+    const result = await db.query('SELECT * FROM users ORDER BY created_at DESC');
+    return result.rows;
   }
 
-  createUser(user: any) {
-    // In a real application, this would save the user to a database
-    return Promise.resolve({ id: '3', ...user });
+  async createUser(user: any) {
+    const { name, email, role, country } = user;
+    const result = await db.query(
+      'INSERT INTO users (name, email, role, country) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, email, role || 'user', country]
+    );
+    return result.rows[0];
   }
 
-  getUserById(id: string) {
-    // In a real application, this would fetch a user by ID from a database
-    const users = [
-      { id: '1', name: 'John Doe' },
-      { id: '2', name: 'Jane Doe' },
-    ];
-    const user = users.find((u) => u.id === id) ?? null;
-    return Promise.resolve(user);
+  async getUserById(id: string) {
+    const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+    return result.rows[0] || null;
   }
 }
 

@@ -37,7 +37,7 @@ export class Server {
           serviceVersion: config.SERVICE_VERSION,
           databaseStatus: db.getConnectionStatus(),
         });
-        console.log(`🚀 User Service is running on port ${config.PORT}`);
+        console.log(`🚀 [DEBUG] User Service listen callback fired on port ${config.PORT}`);
         console.log(`📊 Health check: http://localhost:${config.PORT}/health`);
         console.log(`📈 Metrics: http://localhost:${config.PORT}/metrics`);
         console.log(`👥 Users API: http://localhost:${config.PORT}/api/v1/users`);
@@ -57,10 +57,7 @@ export class Server {
 
   private setupSignalHandlers(): void {
     const gracefulShutdown = (signal: string) => {
-      logger.info(`Received ${signal}, shutting down gracefully`, {
-        component: 'server',
-        signal,
-      });
+      console.log(`Received ${signal}, shutting down gracefully`);
 
       this.httpServer.close(async () => {
         try {
@@ -77,16 +74,12 @@ export class Server {
           console.error('Error disconnecting Redis:', error);
         }
 
-        logger.info('Server closed', {
-          component: 'server',
-        });
+        console.log('Server closed');
         process.exit(0);
       });
 
       setTimeout(() => {
-        logger.error('Forced shutdown after timeout', undefined, {
-          component: 'server',
-        });
+        console.error('Forced shutdown after timeout');
         process.exit(1);
       }, 10000);
     };
@@ -96,13 +89,15 @@ export class Server {
   }
 
   private setupProcessHandlers(): void {
+    // IMPORTANT: Do NOT use async logger here — calling async functions inside
+    // uncaughtException/unhandledRejection handlers can create infinite crash loops.
     process.on('uncaughtException', (error) => {
-      logger.error('Uncaught exception', error as Error);
+      console.error('💥 Uncaught exception:', error);
       process.exit(1);
     });
 
     process.on('unhandledRejection', (reason) => {
-      logger.error('Unhandled rejection', reason as Error);
+      console.error('💥 Unhandled rejection:', reason);
       process.exit(1);
     });
   }
