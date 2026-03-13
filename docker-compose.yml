@@ -111,7 +111,7 @@ services:
 
   # RabbitMQ Message Broker
   rabbitmq:
-    image: rabbitmq:3.13-management-alpine
+    image: rabbitmq:3.13-management
     container_name: obs_rabbitmq
     restart: unless-stopped
     networks:

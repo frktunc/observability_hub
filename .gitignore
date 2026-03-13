@@ -2,6 +2,13 @@
 .DS_Store
 Thumbs.db
 
+# macOS metadata / temporary files
+NOW
+
+# IDE / Editor
+.vscode/
+.idea/
+
 # Environment variables
 .env
 .env.*
@@ -30,20 +37,32 @@ infrastructure/redis/data/
 infrastructure/postgres/data/
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build output
+# Build output (root + all services/packages)
 dist/
 build/
+services/*/dist/
+packages/*/dist/
+golang/dist/
+
+# TypeScript compiled output (JS/declarations from src)
+*.js.map
+*.d.ts.map
+
+# Test coverage
 coverage/
+.nyc_output/
 
-# Temporary test scripts
+# Temporary / scratch test scripts
 services/user-service/run_test.ts
-services/user-service/simple_send.js
 services/user-service/run_test.js
+services/user-service/simple_send.js
+services/user-service/send-test-message.ts
 
+# Redis dump
 dump.rdb
