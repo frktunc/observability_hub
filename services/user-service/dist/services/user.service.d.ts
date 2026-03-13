@@ -1,12 +1,9 @@
-import { UserRepository, CreateUserRequest, UpdateUserRequest } from './user-repository';
-import { User } from '@/types/user';
+import { UserRepository } from './user-repository.js';
 export declare class UserService {
     private repository;
     constructor(repository: UserRepository);
-    getUsers(): Promise<User[]>;
-    getUserById(id: string): Promise<User | null>;
-    createUser(userData: CreateUserRequest): Promise<User>;
-    updateUser(id: string, userData: UpdateUserRequest): Promise<User | null>;
-    deleteUser(id: string): Promise<boolean>;
+    getUsers(): Promise<any>;
+    createUser(user: any): Promise<any>;
+    getUserById(id: string): Promise<any>;
 }
 //# sourceMappingURL=user.service.d.ts.map

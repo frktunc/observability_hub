@@ -61,7 +61,7 @@ const configSchema = zod_1.z.object({
     METRICS_PATH: zod_1.z.string().default('/metrics'),
     // Tracing Configuration
     JAEGER_ENABLED: zod_1.z.coerce.boolean().default(true),
-    OTEL_EXPORTER_OTLP_ENDPOINT: zod_1.z.string().default('http://jaeger:4318/v1/traces'),
+    OTEL_EXPORTER_OTLP_ENDPOINT: zod_1.z.string().default('http://obs_jaeger:4318/v1/traces'),
     // Health Check Configuration
     HEALTH_CHECK_ENABLED: zod_1.z.coerce.boolean().default(true),
     HEALTH_CHECK_PATH: zod_1.z.string().default('/health'),

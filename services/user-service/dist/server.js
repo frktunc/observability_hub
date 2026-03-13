@@ -18,6 +18,9 @@ class Server {
     }
     async start() {
         try {
+            console.log('🔗 Initializing logger connection to RabbitMQ...');
+            await logger_1.logger.connect();
+            console.log('✅ Logger connected to RabbitMQ');
             console.log('🔗 Initializing database connection...');
             await database_1.db.connect();
             console.log('🔗 Initializing Redis services...');
@@ -30,7 +33,7 @@ class Server {
                     serviceVersion: config_1.config.SERVICE_VERSION,
                     databaseStatus: database_1.db.getConnectionStatus(),
                 });
-                console.log(`🚀 User Service is running on port ${config_1.config.PORT}`);
+                console.log(`🚀 [DEBUG] User Service listen callback fired on port ${config_1.config.PORT}`);
                 console.log(`📊 Health check: http://localhost:${config_1.config.PORT}/health`);
                 console.log(`📈 Metrics: http://localhost:${config_1.config.PORT}/metrics`);
                 console.log(`👥 Users API: http://localhost:${config_1.config.PORT}/api/v1/users`);
@@ -49,10 +52,7 @@ class Server {
     }
     setupSignalHandlers() {
         const gracefulShutdown = (signal) => {
-            logger_1.logger.info(`Received ${signal}, shutting down gracefully`, {
-                component: 'server',
-                signal,
-            });
+            console.log(`Received ${signal}, shutting down gracefully`);
             this.httpServer.close(async () => {
                 try {
                     await database_1.db.disconnect();
@@ -68,15 +68,11 @@ class Server {
                 catch (error) {
                     console.error('Error disconnecting Redis:', error);
                 }
-                logger_1.logger.info('Server closed', {
-                    component: 'server',
-                });
+                console.log('Server closed');
                 process.exit(0);
             });
             setTimeout(() => {
-                logger_1.logger.error('Forced shutdown after timeout', undefined, {
-                    component: 'server',
-                });
+                console.error('Forced shutdown after timeout');
                 process.exit(1);
             }, 10000);
         };
@@ -84,12 +80,14 @@ class Server {
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
     }
     setupProcessHandlers() {
+        // IMPORTANT: Do NOT use async logger here — calling async functions inside
+        // uncaughtException/unhandledRejection handlers can create infinite crash loops.
         process.on('uncaughtException', (error) => {
-            logger_1.logger.error('Uncaught exception', error);
+            console.error('💥 Uncaught exception:', error);
             process.exit(1);
         });
         process.on('unhandledRejection', (reason) => {
-            logger_1.logger.error('Unhandled rejection', reason);
+            console.error('💥 Unhandled rejection:', reason);
             process.exit(1);
         });
     }

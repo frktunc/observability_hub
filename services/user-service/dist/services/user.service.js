@@ -6,22 +6,14 @@ class UserService {
     constructor(repository) {
         this.repository = repository;
     }
-    async getUsers() {
-        return this.repository.findAll();
+    getUsers() {
+        return this.repository.getUsers();
     }
-    async getUserById(id) {
-        return this.repository.findById(id);
+    createUser(user) {
+        return this.repository.createUser(user);
     }
-    async createUser(userData) {
-        // Here you could add business logic, validation, etc.
-        return this.repository.create(userData);
-    }
-    async updateUser(id, userData) {
-        // Add business logic before updating
-        return this.repository.update(id, userData);
-    }
-    async deleteUser(id) {
-        return this.repository.delete(id);
+    getUserById(id) {
+        return this.repository.getUserById(id);
     }
 }
 exports.UserService = UserService;

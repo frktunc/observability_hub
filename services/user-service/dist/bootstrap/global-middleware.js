@@ -67,7 +67,11 @@ function applyGlobalMiddleware(app) {
         customLogger: (level, message, metadata) => {
             const logMethod = logger_1.logger[level];
             if (typeof logMethod === 'function') {
-                logMethod(message, metadata);
+                // Logger methods return Promises; cast to any to bypass TS overload resolution,
+                // then catch to prevent unhandledRejection → process.exit(1) crash loop
+                Promise.resolve(logMethod.call(logger_1.logger, message, metadata)).catch((err) => {
+                    console.error(`[customLogger] Failed to log message (level=${level}):`, err?.message ?? err);
+                });
             }
         },
         skipPaths: ['/health', '/metrics']

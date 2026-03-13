@@ -7,13 +7,9 @@ class DatabaseService {
     pool;
     isConnected = false;
     constructor() {
+        // Use ONLY connectionString to avoid conflicts with individual params
         this.pool = new pg_1.Pool({
             connectionString: config_1.derivedConfig.database.url,
-            host: config_1.derivedConfig.database.host,
-            port: config_1.derivedConfig.database.port,
-            database: config_1.derivedConfig.database.name,
-            user: config_1.derivedConfig.database.user,
-            password: config_1.derivedConfig.database.password,
             min: config_1.derivedConfig.database.pool.min,
             max: config_1.derivedConfig.database.pool.max,
             idleTimeoutMillis: 30000,
@@ -29,26 +25,29 @@ class DatabaseService {
         });
     }
     async connect() {
-        try {
-            // Test the connection
-            const client = await this.pool.connect();
-            await client.query('SELECT NOW()');
-            client.release();
-            console.log('✅ Database connected successfully');
-            this.isConnected = true;
-            // Initialize schema
-            await this.initializeSchema();
-        }
-        catch (error) {
-            console.error('❌ Database connection failed:', error);
-            this.isConnected = false;
-            throw error;
+        const maxAttempts = 5;
+        const delayMs = 2000;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const client = await this.pool.connect();
+                await client.query('SELECT NOW()');
+                client.release();
+                console.log('✅ Database connected successfully');
+                this.isConnected = true;
+                await this.initializeSchema();
+                return;
+            }
+            catch (error) {
+                this.isConnected = false;
+                console.error(`❌ Database connection failed (attempt ${attempt}/${maxAttempts}):`, error);
+                if (attempt === maxAttempts)
+                    throw error;
+                console.log(`⏳ Retrying in ${delayMs}ms...`);
+                await new Promise((r) => setTimeout(r, delayMs));
+            }
         }
     }
     async initializeSchema() {
-        // Schema is now managed by infrastructure scripts (e.g., docker-entrypoint-initdb.d)
-        // This function can be used for future migrations if needed, but for now,
-        // it will just confirm that the connection is ready.
         console.log('✅ Database schema is managed by infrastructure, skipping application-level initialization.');
     }
     async query(text, params) {
