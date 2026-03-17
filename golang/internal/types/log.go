@@ -142,6 +142,49 @@ func (d *LogEventData) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON implements custom JSON marshaling for LogEvent
+// This is necessary because LogEvent embeds BaseEvent, which implements MarshalJSON.
+// Without this, json.Marshal would use BaseEvent's marshaler and silently drop the "data" field.
+func (e *LogEvent) MarshalJSON() ([]byte, error) {
+	// 1. Marshal the embedded BaseEvent fields into a map
+	baseBytes, err := e.BaseEvent.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	var baseMap map[string]interface{}
+	if err := json.Unmarshal(baseBytes, &baseMap); err != nil {
+		return nil, err
+	}
+
+	// 2. Add the Data field explicitly
+	baseMap["data"] = e.Data
+
+	// 3. Marshal the combined map back to JSON
+	return json.Marshal(baseMap)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for LogEvent
+// This is necessary because LogEvent embeds BaseEvent, which implements UnmarshalJSON.
+// Without this, json.Unmarshal would use BaseEvent's unmarshaler and silently drop the "data" field.
+func (e *LogEvent) UnmarshalJSON(data []byte) error {
+	// First, umarshal the embedded BaseEvent fields
+	if err := e.BaseEvent.UnmarshalJSON(data); err != nil {
+		return err
+	}
+
+	// Then, unmarshal the Data field specifically
+	var aux struct {
+		Data LogEventData `json:"data"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	e.Data = aux.Data
+
+	return nil
+}
+
 // LogLevelHierarchy defines the numeric values for log level comparison
 var LogLevelHierarchy = map[LogLevel]int{
 	LogLevelTrace: 0,

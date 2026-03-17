@@ -68,7 +68,12 @@ export function createPublisher(
           structured: message.metadata
             ? { fields: message.metadata }
             : undefined,
-          error: message.error || undefined,
+          error: message.error ? {
+            type: message.error.name,
+            cause: message.error.message,
+            stack: message.error.stack,
+            code: message.error.code
+          } : undefined,
         },
         metadata: {
           priority:
