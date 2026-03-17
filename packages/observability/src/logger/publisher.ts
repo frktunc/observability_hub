@@ -49,7 +49,7 @@ export function createPublisher(
 
       const enrichedMessage = {
         eventId,
-        eventType: `log.${message.level.toLowerCase()}.created`,
+        eventType: `log.${message.level.toLowerCase()}`,
         version: '1.0.0',
         timestamp,
         correlationId:

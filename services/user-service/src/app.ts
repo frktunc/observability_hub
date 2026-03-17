@@ -2,7 +2,8 @@ import express from 'express';
 import { applyGlobalMiddleware } from '@/bootstrap/global-middleware';
 import { applyRoutes } from '@/bootstrap/routes';
 import { applyDocsEndpoint } from '@/bootstrap/docs';
-import { defaultErrorHandler } from '@observability-hub/observability/middleware';
+import { errorHandlerMiddleware } from '@observability-hub/observability/middleware';
+import { logger } from '@/bootstrap/logger';
 
 export function createApp(): express.Application {
   const app = express();
@@ -17,7 +18,15 @@ export function createApp(): express.Application {
   applyDocsEndpoint(app);
 
   // Error handling middleware (must be last)
-  app.use(defaultErrorHandler);
+  app.use(errorHandlerMiddleware({
+    customLogger: (error, req) => {
+      logger.error(`Error processing request: ${error.message}`, error, {
+        method: req.method,
+        url: req.url,
+        correlationId: req.correlationId || 'unknown'
+      });
+    }
+  }));
 
   return app;
 }

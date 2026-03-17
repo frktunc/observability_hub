@@ -67,6 +67,7 @@ export class ObservabilityLogger {
       level: LogLevel.TRACE,
       message,
       context: context || undefined,
+      correlationId: context?.correlationId,
     });
   }
 
@@ -75,6 +76,7 @@ export class ObservabilityLogger {
       level: LogLevel.DEBUG,
       message,
       context: context || undefined,
+      correlationId: context?.correlationId,
     });
   }
 
@@ -83,6 +85,7 @@ export class ObservabilityLogger {
       level: LogLevel.INFO,
       message,
       context: context || undefined,
+      correlationId: context?.correlationId,
     });
   }
 
@@ -91,6 +94,7 @@ export class ObservabilityLogger {
       level: LogLevel.WARN,
       message,
       context: context || undefined,
+      correlationId: context?.correlationId,
     });
   }
 
@@ -103,6 +107,7 @@ export class ObservabilityLogger {
       level: LogLevel.ERROR,
       message,
       context: context || undefined,
+      correlationId: context?.correlationId,
       error: error
         ? {
             name: error.name,
@@ -122,6 +127,7 @@ export class ObservabilityLogger {
       level: LogLevel.FATAL,
       message,
       context: context || undefined,
+      correlationId: context?.correlationId,
       error: error
         ? {
             name: error.name,
